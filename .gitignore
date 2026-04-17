@@ -1,0 +1,63 @@
+# Dependency Directories
+node_modules/
+frontend/node_modules/
+backend/venv/
+backend/.venv/
+env/
+.env
+*.env
+
+# Build & Cache
+.next/
+frontend/.next/
+frontend/out/
+backend/__pycache__/
+backend/**/*.pyc
+.cache/
+
+# ML Models & Binary Weights (Large files)
+models/
+**/models/
+!backend/app/models/
+frontend/public/models/
+!frontend/public/models/README.md
+*.bin
+*.model
+*.weights
+*.h5
+*.onnx
+*.pth
+*.pt
+*.tflite
+*.pkl
+*.joblib
+*-shard*
+*-weights_manifest.json
+
+# Python Unimportant / Generated
+__init__.py
+.pytest_cache/
+.tox/
+dist/
+build/
+*.egg-info/
+.coverage
+htmlcov/
+
+# Credentials & Private Configs
+.env*
+!.env.local.example
+private.key
+*.pem
+credentials.json
+
+# IDEs & System Files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.swp
+*.log
+
+# Docker
+.docker_data/

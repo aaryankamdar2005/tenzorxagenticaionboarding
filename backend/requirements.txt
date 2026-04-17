@@ -1,0 +1,14 @@
+fastapi==0.115.12
+uvicorn[standard]==0.34.2
+motor==3.7.0
+pydantic==2.11.3
+python-dotenv==1.1.0
+httpx==0.28.1
+python-multipart==0.0.20
+pytesseract==0.3.13
+Pillow==11.2.1
+rapidfuzz==3.12.2
+easyocr
+numpy
+bcrypt==4.3.0
+PyJWT==2.10.1
