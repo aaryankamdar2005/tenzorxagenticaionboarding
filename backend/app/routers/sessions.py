@@ -61,6 +61,9 @@ async def get_session(session_id: str) -> dict:
 
 @router.post("/sessions/{session_id}/submit")
 async def submit_session(session_id: str) -> dict:
+    import asyncio
+    from app.services.decision_engine import compute_and_save_final_score
+
     db = get_database()
     result = await db["sessions"].update_one(
         {"session_id": session_id},
@@ -68,8 +71,21 @@ async def submit_session(session_id: str) -> dict:
     )
     if result.matched_count == 0:
         raise HTTPException(404, "Session not found")
+
     await log_event("audit_logs", {"session_id": session_id, "event": "SESSION_SUBMITTED"})
+
+    # Trigger AI final scoring asynchronously (don't block the HTTP response)
+    async def _run_scoring():
+        try:
+            await compute_and_save_final_score(session_id)
+        except Exception as exc:
+            import logging
+            logging.getLogger(__name__).warning("Final scoring failed for %s: %s", session_id, exc)
+
+    asyncio.create_task(_run_scoring())
+
     return {"status": "success"}
+
 
 
 # ── Customer: view own applications ──────────────────────────────────────────

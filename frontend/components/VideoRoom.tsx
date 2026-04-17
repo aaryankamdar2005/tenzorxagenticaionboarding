@@ -48,6 +48,11 @@ export default function VideoRoom({ sessionId }: { sessionId: string }) {
   const ageTimerRef        = useRef<NodeJS.Timeout | null>(null);
   const livenessIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const ageReadingsRef     = useRef<number[]>([]);   // raw readings for client-side mode
+  const cameraStreamRef    = useRef<MediaStream | null>(null);
+  const micStreamRef       = useRef<MediaStream | null>(null);
+
+  // ── Media permission state ────────────────────────────────────────────────
+  const [mediaPermission, setMediaPermission]   = useState<"pending" | "requesting" | "granted" | "denied">("pending");
 
   // ── Model & detection state ──────────────────────────────────────────────────
   const [modelsLoaded, setModelsLoaded]   = useState(false);
@@ -82,6 +87,35 @@ export default function VideoRoom({ sessionId }: { sessionId: string }) {
 
   const { detectMetrics, isChallengeComplete } = useLiveness();
 
+  // ── Request camera + mic permission ──────────────────────────────────────────
+  const requestPermissions = useCallback(async () => {
+    setMediaPermission("requesting");
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      const camera = new MediaStream(stream.getVideoTracks());
+      const mic    = new MediaStream(stream.getAudioTracks());
+      cameraStreamRef.current = camera;
+      micStreamRef.current    = mic;
+      if (videoRef.current) videoRef.current.srcObject = camera;
+
+      const mimeType = pickMime();
+      const ws = socketRef.current;
+      if (ws) {
+        const rec = new MediaRecorder(mic, { mimeType });
+        rec.ondataavailable = async (e) => {
+          if (e.data.size > 0 && ws.readyState === WebSocket.OPEN)
+            ws.send(await e.data.arrayBuffer());
+        };
+        recorderRef.current = rec;
+      }
+      setMediaPermission("granted");
+    } catch (err) {
+      console.warn("[VideoRoom] Media permission denied or error:", err);
+      setMediaPermission("denied");
+    }
+  }, []);
+
+
   // ─────────────────────────────────────────────────────────────────────────────
   // Restore session state on mount / reload
   // ─────────────────────────────────────────────────────────────────────────────
@@ -97,7 +131,8 @@ export default function VideoRoom({ sessionId }: { sessionId: string }) {
         if (data.latest_offer)      setOffer(data.latest_offer);
         if (data.final_score)       setFinalScore(data.final_score);
         if (data.state)             setSessionState(data.state);
-        if (data.review_status === "SUBMITTED") setSubmitStatus("done");
+        // Restore submit status — backend sets state=SUBMITTED via /submit endpoint
+        if (data.state === "SUBMITTED" || data.review_status === "SUBMITTED") setSubmitStatus("done");
 
         // Restore biometric
         if (data.liveness_result) {
@@ -152,11 +187,9 @@ export default function VideoRoom({ sessionId }: { sessionId: string }) {
   }, [addSubtitle]);
 
   // ─────────────────────────────────────────────────────────────────────────────
-  // Main WebSocket + camera + mic + face-api models
+  // Main WebSocket + face-api models (no camera/mic yet — wait for permission)
   // ─────────────────────────────────────────────────────────────────────────────
   useEffect(() => {
-    let camera: MediaStream | null = null;
-    let mic:    MediaStream | null = null;
     const ws = new WebSocket(`${WS_URL}/ws/${sessionId}`);
     socketRef.current = ws;
     ws.onmessage = handleWsMessage;
@@ -171,33 +204,16 @@ export default function VideoRoom({ sessionId }: { sessionId: string }) {
         setModelsLoaded(true);
         console.log("[face-api] All models loaded ✓");
       } catch (e) { console.error("Face models failed", e); }
-
-      // Camera + mic
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-        camera = new MediaStream(stream.getVideoTracks());
-        mic    = new MediaStream(stream.getAudioTracks());
-        if (videoRef.current) videoRef.current.srcObject = camera;
-      } catch (e) { console.error("Mic/Cam failed", e); }
-
-      if (mic) {
-        const mimeType = pickMime();
-        const rec = new MediaRecorder(mic, { mimeType });
-        rec.ondataavailable = async (e) => {
-          if (e.data.size > 0 && ws.readyState === WebSocket.OPEN)
-            ws.send(await e.data.arrayBuffer());
-        };
-        recorderRef.current = rec;
-      }
     })();
 
     return () => {
-      camera?.getTracks().forEach(t => t.stop());
-      mic?.getTracks().forEach(t => t.stop());
+      cameraStreamRef.current?.getTracks().forEach(t => t.stop());
+      micStreamRef.current?.getTracks().forEach(t => t.stop());
       if (ageTimerRef.current) clearInterval(ageTimerRef.current);
       ws.close();
     };
   }, [sessionId, handleWsMessage]);
+
 
   // ─────────────────────────────────────────────────────────────────────────────
   // Age detection loop — every 3 s; tracks mode of readings over last 30
@@ -299,13 +315,32 @@ export default function VideoRoom({ sessionId }: { sessionId: string }) {
     setSubmitStatus("loading");
     try {
       const res = await fetch(`${API_URL}/api/sessions/${sessionId}/submit`, { method: "POST" });
-      if (res.ok) { setSubmitStatus("done"); setSessionState("SUBMITTED"); }
-      else setSubmitStatus("error");
+      if (!res.ok) { setSubmitStatus("error"); return; }
+      setSubmitStatus("done");
+      setSessionState("SUBMITTED");
+
+      // Poll up to 15s for the AI final score to be computed
+      let attempts = 0;
+      const poll = setInterval(async () => {
+        attempts++;
+        try {
+          const scoreRes = await fetch(`${API_URL}/api/sessions/${sessionId}`);
+          if (scoreRes.ok) {
+            const data = await scoreRes.json();
+            if (data.final_score) {
+              setFinalScore(data.final_score);
+              clearInterval(poll);
+            }
+          }
+        } catch { /* ignore */ }
+        if (attempts >= 15) clearInterval(poll); // stop after 15s
+      }, 1000);
     } catch { setSubmitStatus("error"); }
   };
 
-  const agentReply = subtitles.filter(s => s.speaker === "agent").pop()?.text;
-  const userText   = subtitles.filter(s => s.speaker === "user").pop()?.text;
+
+  const lastAgentMsg = subtitles.filter(s => s.speaker === "agent").slice(-1)[0];
+  const lastUserMsg  = subtitles.filter(s => s.speaker === "user").slice(-1)[0];
 
   // ─────────────────────────────────────────────────────────────────────────────
   //  Readability helpers
@@ -325,7 +360,105 @@ export default function VideoRoom({ sessionId }: { sessionId: string }) {
   const db = docBadge();
 
   return (
-    <div className="min-h-screen bg-slate-100 text-slate-900 pt-6 px-6">
+    <div className="min-h-screen bg-slate-100 text-slate-900 pt-4 pb-10 px-3 sm:pt-6 sm:px-6">
+
+      {/* ── Camera/Mic Permission Gate ───────────────────────────────────────── */}
+      {mediaPermission !== "granted" && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/80 backdrop-blur-sm p-4">
+          <div className="w-full max-w-md rounded-2xl bg-white shadow-2xl border border-slate-200 overflow-hidden">
+            {/* Top accent bar */}
+            <div className="h-1.5 w-full bg-gradient-to-r from-blue-500 via-blue-600 to-indigo-600" />
+
+            <div className="p-8 text-center">
+              {mediaPermission === "denied" ? (
+                <>
+                  {/* Denied state */}
+                  <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-red-50 border-2 border-red-200">
+                    <svg className="h-7 w-7 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </div>
+                  <h2 className="text-xl font-bold text-slate-900 mb-2">Camera & Microphone Blocked</h2>
+                  <p className="text-sm text-slate-600 mb-1">
+                    Access was denied. To continue with your KYC session, you need to allow access.
+                  </p>
+                  <div className="mt-4 mb-6 rounded-xl bg-amber-50 border border-amber-200 p-4 text-left">
+                    <p className="text-xs font-bold text-amber-800 mb-2">How to fix this:</p>
+                    <ul className="text-xs text-amber-700 space-y-1.5 list-disc ml-4">
+                      <li>Click the <strong>camera/lock icon</strong> in your browser&apos;s address bar</li>
+                      <li>Set <strong>Camera</strong> and <strong>Microphone</strong> to <strong>Allow</strong></li>
+                      <li>Then click <strong>&quot;Try Again&quot;</strong> below</li>
+                    </ul>
+                  </div>
+                  <button
+                    onClick={requestPermissions}
+                    className="w-full rounded-xl bg-blue-600 py-3.5 text-sm font-bold text-white hover:bg-blue-700 transition shadow-sm"
+                  >
+                    🔄 Try Again
+                  </button>
+                </>
+              ) : (
+                <>
+                  {/* Pending / requesting state */}
+                  <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-blue-50 border-2 border-blue-200">
+                    {mediaPermission === "requesting" ? (
+                      <svg className="h-7 w-7 text-blue-500 animate-spin" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                      </svg>
+                    ) : (
+                      <svg className="h-7 w-7 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 10.5l4.72-4.72a.75.75 0 011.28.53v11.38a.75.75 0 01-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 002.25-2.25v-9a2.25 2.25 0 00-2.25-2.25h-9A2.25 2.25 0 002.25 7.5v9a2.25 2.25 0 002.25 2.25z" />
+                      </svg>
+                    )}
+                  </div>
+                  <h2 className="text-xl font-bold text-slate-900 mb-2">
+                    {mediaPermission === "requesting" ? "Waiting for Permission…" : "Camera & Microphone Access Required"}
+                  </h2>
+                  <p className="text-sm text-slate-600 mb-6">
+                    {mediaPermission === "requesting"
+                      ? "Please check the browser prompt at the top of the page and click \"Allow\"."
+                      : "This secure Video KYC session requires access to your camera and microphone to verify your identity and record your responses."
+                    }
+                  </p>
+
+                  {/* Feature list */}
+                  {mediaPermission === "pending" && (
+                    <div className="mb-6 space-y-2 text-left">
+                      {[
+                        { icon: "🎥", text: "Camera — for identity & liveness verification" },
+                        { icon: "🎙️", text: "Microphone — to capture your spoken responses" },
+                        { icon: "🔒", text: "Your data is encrypted and never stored beyond this session" },
+                      ].map(({ icon, text }) => (
+                        <div key={text} className="flex items-center gap-3 rounded-xl bg-slate-50 border border-slate-200 px-4 py-2.5">
+                          <span className="text-lg">{icon}</span>
+                          <span className="text-xs text-slate-700 font-medium">{text}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  <button
+                    onClick={requestPermissions}
+                    disabled={mediaPermission === "requesting"}
+                    className="w-full rounded-xl bg-blue-600 py-3.5 text-sm font-bold text-white hover:bg-blue-700 transition shadow-sm disabled:opacity-60 flex items-center justify-center gap-2"
+                  >
+                    {mediaPermission === "requesting" ? (
+                      <><svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg> Waiting…</>
+                    ) : (
+                      "Allow Camera & Microphone"
+                    )}
+                  </button>
+                  <p className="mt-3 text-[11px] text-slate-400">
+                    A browser permission dialog will appear. Click <strong>Allow</strong> to continue.
+                  </p>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {showMultiDoc && (
         <MultiDocCapture
           sessionId={sessionId}
@@ -339,26 +472,26 @@ export default function VideoRoom({ sessionId }: { sessionId: string }) {
 
       <div className="mx-auto max-w-7xl">
         {/* ── Header ── */}
-        <div className="flex items-center justify-between mb-8">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5 sm:mb-8">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-600 text-white">
-              <ShieldCheck size={22} />
+            <div className="flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-xl bg-blue-600 text-white shrink-0">
+              <ShieldCheck size={20} />
             </div>
             <div>
-              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">SecureBank Core</p>
-              <h1 className="text-xl font-bold text-slate-900">Identity Verification Session</h1>
+              <p className="text-[9px] sm:text-[10px] font-bold uppercase tracking-widest text-slate-500">SecureBank Core</p>
+              <h1 className="text-lg sm:text-xl font-bold text-slate-900">Identity Verification Session</h1>
             </div>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
             {detectedAge && (
-              <div className="flex items-center gap-2 rounded-full bg-blue-600 px-4 py-1.5 text-white">
-                <BadgeCheck size={14} />
-                <span className="text-[11px] font-bold uppercase tracking-widest">Est. Age: {detectedAge}Y</span>
+              <div className="flex items-center gap-1.5 rounded-full bg-blue-600 px-3 py-1.5 text-white">
+                <BadgeCheck size={13} />
+                <span className="text-[10px] font-bold uppercase tracking-widest">Age: {detectedAge}Y</span>
               </div>
             )}
-            <div className={`flex items-center gap-2 rounded-full px-4 py-1.5 border ${isRecording ? "bg-emerald-100 border-emerald-400 text-emerald-800" : "bg-white border-slate-300 text-slate-600"}`}>
-              <div className={`h-2 w-2 rounded-full ${isRecording ? "bg-emerald-500 animate-pulse" : "bg-slate-400"}`} />
-              <span className="text-[10px] font-bold uppercase tracking-widest">{isRecording ? "Listening" : "Connected"}</span>
+            <div className={`flex items-center gap-2 rounded-full px-3 py-1.5 border text-xs sm:text-[10px] ${isRecording ? "bg-emerald-100 border-emerald-400 text-emerald-800" : "bg-white border-slate-300 text-slate-600"}`}>
+              <div className={`h-2 w-2 rounded-full shrink-0 ${isRecording ? "bg-emerald-500 animate-pulse" : "bg-slate-400"}`} />
+              <span className="font-bold uppercase tracking-widest">{isRecording ? "Listening" : "Connected"}</span>
             </div>
           </div>
         </div>
@@ -367,6 +500,7 @@ export default function VideoRoom({ sessionId }: { sessionId: string }) {
         <AnimatePresence>
           {submitStatus === "done" && (
             <motion.div
+              key="submit-success-banner"
               initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
               className="mb-6 flex items-center gap-3 rounded-xl bg-blue-600 px-6 py-4 text-white shadow-md"
             >
@@ -379,6 +513,7 @@ export default function VideoRoom({ sessionId }: { sessionId: string }) {
           )}
           {sessionFailed && (
             <motion.div
+              key="session-failed-banner"
               initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}
               className="mb-6 flex items-center gap-3 rounded-xl bg-red-700 px-6 py-4 text-white shadow-md"
             >
@@ -391,18 +526,18 @@ export default function VideoRoom({ sessionId }: { sessionId: string }) {
           )}
         </AnimatePresence>
 
-        <div className="grid grid-cols-1 gap-8 lg:grid-cols-12">
+        <div className="grid grid-cols-1 gap-5 lg:grid-cols-12">
           {/* ── Left: Video + Transcript ── */}
-          <div className="lg:col-span-8 flex flex-col gap-6">
+          <div className="lg:col-span-8 flex flex-col gap-4 sm:gap-6">
             {/* Video */}
-            <div className="relative aspect-video overflow-hidden rounded-2xl bg-slate-900 shadow-lg border border-slate-300">
+            <div className="relative aspect-video overflow-hidden rounded-xl sm:rounded-2xl bg-slate-900 shadow-lg border border-slate-300">
               <video ref={videoRef} autoPlay playsInline muted className="h-full w-full object-cover" />
               <canvas ref={canvasRef} className="absolute inset-0 pointer-events-none" />
 
               {/* Liveness overlay */}
               <AnimatePresence>
                 {liveness.active && (
-                  <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                  <motion.div key="liveness-overlay" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
                     className="absolute inset-0 flex items-center justify-center bg-slate-900/60 backdrop-blur-[2px]">
                     <div className="rounded-2xl bg-white p-8 shadow-2xl border border-slate-200 max-w-sm w-full text-center">
                       <p className="text-xs font-bold uppercase tracking-widest text-blue-600 mb-2">Biometric Challenge</p>
@@ -454,8 +589,8 @@ export default function VideoRoom({ sessionId }: { sessionId: string }) {
             </div>
 
             {/* Transcript Console */}
-            <div className="rounded-2xl bg-white border border-slate-200 shadow-sm overflow-hidden flex flex-col h-52">
-              <div className="bg-slate-50 px-6 py-3 border-b border-slate-200 flex items-center justify-between">
+            <div className="rounded-xl sm:rounded-2xl bg-white border border-slate-200 shadow-sm overflow-hidden flex flex-col h-44 sm:h-52">
+              <div className="bg-slate-50 px-4 sm:px-6 py-3 border-b border-slate-200 flex items-center justify-between">
                 <div className="flex items-center gap-2 text-slate-700 font-bold uppercase tracking-widest text-[10px]">
                   <MessageSquare size={12} /> Live Support Assistant
                 </div>
@@ -466,26 +601,36 @@ export default function VideoRoom({ sessionId }: { sessionId: string }) {
                   </span>
                 )}
               </div>
-              <div className="p-6 overflow-y-auto flex-1 space-y-4">
+              <div className="p-4 sm:p-6 overflow-y-auto flex-1 space-y-4">
                 <AnimatePresence mode="popLayout">
-                  {agentReply && (
-                    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="flex gap-3">
+                  {lastAgentMsg && (
+                    <motion.div 
+                      key={`agent-${lastAgentMsg.id}`} 
+                      initial={{ opacity: 0, y: 10 }} 
+                      animate={{ opacity: 1, y: 0 }} 
+                      className="flex gap-3"
+                    >
                       <div className="shrink-0 h-8 w-8 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-xs">A</div>
                       <div>
-                        <p className="text-sm font-semibold text-slate-900 leading-relaxed">{agentReply}</p>
+                        <p className="text-sm font-semibold text-slate-900 leading-relaxed">{lastAgentMsg.text}</p>
                       </div>
                     </motion.div>
                   )}
-                  {userText && (
-                    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="flex gap-3 flex-row-reverse">
+                  {lastUserMsg && (
+                    <motion.div 
+                      key={`user-${lastUserMsg.id}`} 
+                      initial={{ opacity: 0, y: 10 }} 
+                      animate={{ opacity: 1, y: 0 }} 
+                      className="flex gap-3 flex-row-reverse"
+                    >
                       <div className="shrink-0 h-8 w-8 rounded-full bg-slate-200 text-slate-700 flex items-center justify-center font-bold text-xs">U</div>
                       <div className="text-right">
-                        <p className="text-sm italic text-slate-700 leading-relaxed">{userText}</p>
+                        <p className="text-sm italic text-slate-700 leading-relaxed">{lastUserMsg.text}</p>
                       </div>
                     </motion.div>
                   )}
                 </AnimatePresence>
-                {!agentReply && !userText && (
+                {!lastAgentMsg && !lastUserMsg && (
                   <div className="h-full flex items-center justify-center text-slate-400 text-xs gap-2">
                     <Info size={14} /> Establishing secure communication...
                   </div>
@@ -495,11 +640,11 @@ export default function VideoRoom({ sessionId }: { sessionId: string }) {
           </div>
 
           {/* ── Right: Sidebar ── */}
-          <div className="lg:col-span-4 flex flex-col gap-5">
+          <div className="lg:col-span-4 flex flex-col gap-4 sm:gap-5">
 
             {/* KYC Fields */}
-            <div className="rounded-2xl bg-white border border-slate-200 p-6 shadow-sm">
-              <h3 className="mb-4 flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-slate-600">
+            <div className="rounded-xl sm:rounded-2xl bg-white border border-slate-200 p-4 sm:p-6 shadow-sm">
+              <h3 className="mb-3 sm:mb-4 flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-slate-600">
                 <BadgeCheck size={14} className="text-blue-600" /> KYC Information
               </h3>
               <div className="space-y-2">
@@ -525,7 +670,7 @@ export default function VideoRoom({ sessionId }: { sessionId: string }) {
             </div>
 
             {/* Security Checks */}
-            <div className="rounded-2xl bg-white border border-slate-200 p-6 shadow-sm">
+            <div className="rounded-xl sm:rounded-2xl bg-white border border-slate-200 p-4 sm:p-6 shadow-sm">
               <h3 className="mb-4 flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-slate-600">
                 <CheckCircle size={14} className="text-blue-600" /> Security Checks
               </h3>
@@ -551,7 +696,7 @@ export default function VideoRoom({ sessionId }: { sessionId: string }) {
             {/* Action Buttons */}
             <div className="flex flex-col gap-3">
               <button onClick={() => setShowMultiDoc(true)}
-                className="w-full rounded-xl bg-blue-600 py-3.5 text-sm font-bold text-white hover:bg-blue-700 transition shadow-sm">
+                className="w-full rounded-xl bg-blue-600 py-3 sm:py-3.5 text-sm font-bold text-white hover:bg-blue-700 transition shadow-sm">
                 Verify Proof of Identity
               </button>
               <button
@@ -591,8 +736,50 @@ export default function VideoRoom({ sessionId }: { sessionId: string }) {
               </button>
             </div>
 
+            {/* AI score is intentionally hidden from the customer — visible to banker only */}
+            {submitStatus === "done" && !finalScore && (
+              <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-xs text-blue-700 font-medium">
+                ⏳ Your application is being reviewed. You will be notified once a decision is made.
+              </div>
+            )}
+
+            {/* ── Loan Offer Card ──────────────────────────── */}
+            {offer && (
+              <div className={`rounded-xl sm:rounded-2xl border p-4 sm:p-5 ${
+                offer.status === "APPROVED" ? "bg-blue-50 border-blue-200"
+                : offer.status === "REJECTED" ? "bg-red-50 border-red-200"
+                : "bg-slate-50 border-slate-200"
+              }`}>
+                <h3 className="mb-3 flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-slate-600">
+                  <BadgeCheck size={13} className="text-blue-600" /> Loan Offer Details
+                </h3>
+                <div className={`rounded-lg px-3 py-2 text-center text-xs font-bold mb-3 ${
+                  offer.status === "APPROVED" ? "bg-blue-600 text-white"
+                  : offer.status === "REJECTED" ? "bg-red-600 text-white"
+                  : "bg-amber-500 text-white"
+                }`}>{String(offer.status)}</div>
+                {offer.amount && (
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="text-center bg-white rounded-lg border border-slate-200 p-2">
+                      <p className="text-[9px] text-slate-500 font-medium uppercase">Amount</p>
+                      <p className="text-xs font-black text-slate-900">₹{Number(offer.amount).toLocaleString()}</p>
+                    </div>
+                    {offer.roi && <div className="text-center bg-white rounded-lg border border-slate-200 p-2">
+                      <p className="text-[9px] text-slate-500 font-medium uppercase">Rate</p>
+                      <p className="text-xs font-black text-slate-900">{offer.roi}%</p>
+                    </div>}
+                    {offer.tenure_months && <div className="text-center bg-white rounded-lg border border-slate-200 p-2">
+                      <p className="text-[9px] text-slate-500 font-medium uppercase">Tenure</p>
+                      <p className="text-xs font-black text-slate-900">{offer.tenure_months}mo</p>
+                    </div>}
+                  </div>
+                )}
+                {offer.reason && <p className="mt-2 text-[10px] text-slate-500">{offer.reason}</p>}
+              </div>
+            )}
+
             {/* Manual Testing Section */}
-            <div className="rounded-2xl bg-white border border-dashed border-slate-300 p-5">
+            <div className="rounded-xl sm:rounded-2xl bg-white border border-dashed border-slate-300 p-4 sm:p-5">
               <h4 className="mb-3 text-[10px] font-bold uppercase tracking-wider text-slate-600 flex items-center gap-2">
                 <Clock size={12} /> QA &amp; Manual Testing
               </h4>

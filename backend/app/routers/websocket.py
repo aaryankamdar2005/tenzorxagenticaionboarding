@@ -130,7 +130,7 @@ async def _run_agent_turn(ws: WebSocket, session_id: str, user_text: str, detect
         )
 
         await _emit(ws, WSOutboundEvent(type="PROCESSING_OFFER", payload={}))
-        offer = generate_offer(_avg_age(session_id), kyc)
+        offer = generate_offer(_mode_age(session_id), kyc)
 
         db = get_database()
         await db["sessions"].update_one(

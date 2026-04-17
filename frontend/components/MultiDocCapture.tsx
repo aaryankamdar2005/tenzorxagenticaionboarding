@@ -89,172 +89,92 @@ export default function MultiDocCapture({ sessionId, videoRef, spokenName, spoke
   const isIdentityDoc = activeDoc === "pan" || activeDoc === "aadhaar";
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-sm p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-white/95 backdrop-blur-sm p-4 overflow-y-auto">
       <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
-        className="w-full max-w-2xl rounded-2xl border border-cyan-500/20 bg-slate-950 shadow-2xl overflow-hidden">
+        className="w-full max-w-3xl rounded-2xl border border-gray-200 bg-white shadow-2xl overflow-hidden flex flex-col md:flex-row">
 
-        {/* Header */}
-        <div className="flex items-center justify-between border-b border-slate-800 px-6 py-4">
-          <div>
-            <h2 className="font-semibold text-cyan-100">Multi-Document Verification</h2>
-            <p className="text-xs text-slate-500 mt-0.5">AI-powered OCR + LLM extraction</p>
+        {/* Sidebar */}
+        <div className="w-full md:w-56 border-b md:border-b-0 md:border-r border-gray-100 bg-gray-50 p-4 space-y-2 shrink-0">
+          <div className="mb-4 hidden md:block">
+            <h2 className="font-bold text-gray-900">Verification</h2>
+            <p className="text-[11px] text-gray-500">AI-powered extraction</p>
           </div>
-          <button onClick={onClose} className="rounded-lg p-1.5 text-slate-500 hover:text-white transition"><X size={18} /></button>
-        </div>
-
-        <div className="flex">
-          {/* Sidebar — doc type selector */}
-          <div className="w-44 border-r border-slate-800 p-3 space-y-1.5 shrink-0">
-            {DOC_TYPES.map(doc => {
-              const done = !!results[doc.id];
-              return (
-                <button key={doc.id} onClick={() => { setActiveDoc(doc.id as DocTypeId); reset(); }}
-                  className={`w-full text-left rounded-xl px-3 py-2.5 transition text-sm ${
-                    activeDoc === doc.id
-                      ? "bg-electric-cyan/10 border border-electric-cyan/30 text-white"
-                      : "text-slate-400 hover:bg-slate-800/50 hover:text-slate-200"
-                  }`}>
-                  <div className="flex items-center justify-between">
-                    <span>{doc.icon} {doc.label}</span>
-                    {done && <CheckCircle size={12} className="text-emerald-400" />}
-                  </div>
-                  <p className="text-[10px] text-slate-600 mt-0.5">{doc.desc}</p>
-                </button>
-              );
-            })}
-          </div>
-
-          {/* Main content */}
-          <div className="flex-1 p-5 space-y-4 min-w-0">
-            {/* Mode tabs */}
-            <div className="flex gap-2">
-              {(["upload", "camera"] as const).map(m => (
-                <button key={m} onClick={() => { setMode(m); reset(); }}
-                  className={`flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-medium transition ${
-                    mode === m ? "border border-electric-cyan/40 bg-electric-cyan/10 text-electric-cyan" 
-                    : "border border-slate-700 text-slate-500 hover:text-slate-300"
-                  }`}>
-                  {m === "upload" ? <Upload size={12} /> : <Camera size={12} />}
-                  {m === "upload" ? "Upload File" : "Camera Capture"}
-                </button>
-              ))}
-            </div>
-
-            {/* Tips */}
-            {!captured && (
-              <div className="rounded-lg border border-slate-700/50 bg-slate-900/50 p-3 text-xs text-slate-500 space-y-1">
-                <p className="font-medium text-slate-400">📋 Tips for accurate extraction:</p>
-                <ul className="list-disc ml-4 space-y-0.5">
-                  <li>Ensure document is flat, fully visible, and well-lit</li>
-                  <li>Avoid glare or shadows on the text</li>
-                  <li>Use the highest resolution image available</li>
-                </ul>
-              </div>
-            )}
-
-            {/* File upload */}
-            {mode === "upload" && !captured && (
-              <>
-                <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFile} className="hidden" id="multi-doc-upload" />
-                <label htmlFor="multi-doc-upload"
-                  className="flex cursor-pointer flex-col items-center gap-3 rounded-xl border-2 border-dashed border-slate-700 py-8 hover:border-electric-cyan/40 hover:bg-electric-cyan/5 transition">
-                  <Upload size={28} className="text-slate-600" />
-                  <span className="text-sm text-slate-400">Click to choose image</span>
-                  <span className="text-xs text-slate-600">JPG · PNG · WEBP · up to 15 MB</span>
-                </label>
-              </>
-            )}
-
-            {/* Camera capture */}
-            {mode === "camera" && !captured && (
-              <button onClick={captureFrame}
-                className="w-full flex items-center justify-center gap-2 rounded-xl border border-slate-600 bg-slate-900/50 py-8 text-sm text-slate-300 hover:border-electric-cyan/40 hover:text-white transition">
-                <Camera size={20} /> Capture Frame from Camera
+          {DOC_TYPES.map(doc => {
+            const done = !!results[doc.id];
+            return (
+              <button key={doc.id} onClick={() => { setActiveDoc(doc.id as DocTypeId); reset(); }}
+                className={`w-full text-left rounded-lg px-3 py-3 transition text-sm font-medium ${
+                  activeDoc === doc.id
+                    ? "bg-blue-600 text-white shadow-md"
+                    : "text-gray-600 hover:bg-gray-200"
+                }`}>
+                <div className="flex items-center justify-between">
+                  <span>{doc.icon} {doc.label}</span>
+                  {done && <CheckCircle size={14} className={activeDoc === doc.id ? "text-white" : "text-green-600"} />}
+                </div>
               </button>
-            )}
-
-            {/* Preview */}
-            {captured && (
-              <div className="overflow-hidden rounded-xl border border-slate-700">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={captured} alt="Document" className="w-full max-h-48 object-contain bg-black" />
-              </div>
-            )}
-
-            {/* Result */}
-            {currentResult && (
-              <div className="rounded-xl border border-slate-700 bg-slate-900/60 p-4 space-y-3">
-                <div className="flex items-center gap-2">
-                  {currentResult.is_match
-                    ? <CheckCircle size={16} className="text-emerald-400" />
-                    : <AlertCircle size={16} className="text-amber-400" />}
-                  <span className={`text-sm font-medium ${currentResult.is_match ? "text-emerald-300" : "text-amber-300"}`}>
-                    {currentResult.is_match ? "Document verified ✓" : "Verification incomplete"}
-                  </span>
-                  {isIdentityDoc && (
-                    <span className={`ml-auto text-lg font-bold ${currentResult.match_score >= 80 ? "text-emerald-400" : currentResult.match_score >= 60 ? "text-amber-400" : "text-red-400"}`}>
-                      {currentResult.match_score.toFixed(0)}%
-                    </span>
-                  )}
-                </div>
-
-                {/* Extracted fields */}
-                <div className="grid grid-cols-2 gap-2 text-xs">
-                  {isIdentityDoc && (
-                    <>
-                      <div><p className="text-slate-500 mb-0.5">Extracted Name</p><p className="text-slate-200">{currentResult.extracted.name ?? <span className="italic text-slate-600">Not found</span>}</p></div>
-                      <div><p className="text-slate-500 mb-0.5">Extracted DOB</p><p className="text-slate-200">{currentResult.extracted.dob ?? <span className="italic text-slate-600">Not found</span>}</p></div>
-                      {currentResult.extracted.id_number && (
-                        <div className="col-span-2"><p className="text-slate-500 mb-0.5">ID Number</p><p className="font-mono text-electric-cyan">{currentResult.extracted.id_number}</p></div>
-                      )}
-                    </>
-                  )}
-                  {!isIdentityDoc && currentResult.extracted.verified_monthly_income && (
-                    <div className="col-span-2">
-                      <p className="text-slate-500 mb-0.5">Verified Monthly Income</p>
-                      <p className="text-xl font-bold text-emerald-400">₹{currentResult.extracted.verified_monthly_income.toLocaleString()}</p>
-                      {currentResult.extracted.bank_name && <p className="text-slate-500 mt-0.5">{currentResult.extracted.bank_name}</p>}
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {error && <p className="rounded-lg bg-red-900/20 border border-red-500/30 px-3 py-2 text-xs text-red-300">{error}</p>}
-
-            {/* Hidden canvas */}
-            <canvas ref={canvasRef} className="hidden" />
-
-            {/* Actions */}
-            <div className="flex gap-3">
-              {captured && !currentResult && (
-                <>
-                  <button onClick={reset} className="flex-1 rounded-xl border border-slate-600 py-2.5 text-sm text-slate-300 hover:bg-slate-800 transition">
-                    {mode === "camera" ? "Retake" : "Choose different"}
-                  </button>
-                  <button onClick={submit} disabled={loading}
-                    className="flex-1 rounded-xl bg-electric-cyan/10 border border-electric-cyan/30 py-2.5 text-sm font-semibold text-electric-cyan hover:bg-electric-cyan/20 transition disabled:opacity-50 flex items-center justify-center gap-2">
-                    {loading ? <><Loader size={14} className="animate-spin" /> Extracting…</> : "🔍 Extract with AI"}
-                  </button>
-                </>
-              )}
-              {currentResult && (
-                <button onClick={reset} className="flex-1 rounded-xl border border-slate-600 py-2.5 text-sm text-slate-300 hover:bg-slate-800 transition">
-                  Scan another {DOC_TYPES.find(d => d.id === activeDoc)?.label}
-                </button>
-              )}
-            </div>
-          </div>
+            );
+          })}
         </div>
 
-        {/* Progress footer */}
-        <div className="border-t border-slate-800 px-6 py-3 flex items-center justify-between">
+        {/* Main content */}
+        <div className="flex-1 p-6 space-y-6">
+          <div className="flex items-center justify-between">
+            <h3 className="font-bold text-gray-900 text-lg">{DOC_TYPES.find(d => d.id === activeDoc)?.label}</h3>
+            <button onClick={onClose} className="text-gray-400 hover:text-gray-900"><X size={20} /></button>
+          </div>
+
           <div className="flex gap-2">
-            {DOC_TYPES.map(d => (
-              <div key={d.id} className={`h-1.5 w-8 rounded-full transition-all ${results[d.id] ? "bg-electric-cyan" : "bg-slate-700"}`} />
+            {(["upload", "camera"] as const).map(m => (
+              <button key={m} onClick={() => { setMode(m); reset(); }}
+                className={`flex-1 flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition ${
+                  mode === m ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                }`}>
+                {m === "upload" ? <Upload size={16} /> : <Camera size={16} />}
+                {m === "upload" ? "Upload" : "Camera"}
+              </button>
             ))}
           </div>
-          <p className="text-xs text-slate-600">{Object.keys(results).length}/{DOC_TYPES.length} documents verified</p>
+
+          {!captured && (
+            <div className="border-2 border-dashed border-gray-200 rounded-xl p-8 flex flex-col items-center text-center">
+              {mode === "upload" ? (
+                <>
+                  <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFile} className="hidden" id="upload" />
+                  <label htmlFor="upload" className="cursor-pointer text-blue-600 font-semibold">Browse files</label>
+                  <p className="text-xs text-gray-400 mt-1">PNG, JPG up to 15MB</p>
+                </>
+              ) : (
+                <button onClick={captureFrame} className="text-blue-600 font-semibold">Open Camera</button>
+              )}
+            </div>
+          )}
+
+          {captured && (
+            <div className="rounded-xl overflow-hidden border border-gray-200">
+              <img src={captured} alt="Preview" className="w-full h-48 object-cover" />
+            </div>
+          )}
+
+          {currentResult && (
+            <div className="bg-gray-50 p-4 rounded-xl border border-gray-100">
+              <p className="text-sm font-bold text-gray-900 mb-2">Extraction Results</p>
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div><p className="text-gray-500 text-xs">Name</p><p className="text-gray-900">{currentResult.extracted.name || "-"}</p></div>
+                <div><p className="text-gray-500 text-xs">DOB</p><p className="text-gray-900">{currentResult.extracted.dob || "-"}</p></div>
+              </div>
+            </div>
+          )}
+
+          {error && <p className="text-red-600 text-xs bg-red-50 p-3 rounded-lg">{error}</p>}
+
+          <div className="flex gap-3">
+            {captured && !currentResult && (
+              <button onClick={submit} disabled={loading} className="w-full bg-blue-600 text-white py-3 rounded-lg font-bold hover:bg-blue-700 flex items-center justify-center gap-2">
+                {loading ? <Loader className="animate-spin" size={18} /> : "Verify Document"}
+              </button>
+            )}
+          </div>
         </div>
       </motion.div>
     </div>

@@ -16,7 +16,7 @@ def _mock_bureau_score(income: float | None) -> int:
 
 
 def generate_offer(detected_age: float | None, extraction: KYCExtraction) -> OfferResult:
-    if detected_age is not None and detected_age < 18:
+    if detected_age is not None and detected_age < 16:  # 2-yr face-detection tolerance (18 - 2)
         return OfferResult(status=Status.REJECTED, reason="Applicant under legal age")
 
     if extraction.explicit_consent is False:

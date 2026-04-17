@@ -30,7 +30,7 @@ async def compute_and_save_final_score(session_id: str) -> AuditScore:
         )
 
     kyc_fields: dict = doc.get("latest_extraction") or {}
-    avg_age: float | None = doc.get("avg_age_estimate")
+    avg_age: float | None = doc.get("best_age_estimate")  # WS router saves as best_age_estimate
     liveness: dict = doc.get("liveness_result") or {}
     doc_verify: dict = doc.get("document_verification") or {}
     geo: dict = doc.get("geo_result") or {}

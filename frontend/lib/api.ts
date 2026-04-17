@@ -54,10 +54,11 @@ export async function createSession(): Promise<SessionResponse> {
   const auth = loadAuth();
   const body: Record<string, string> = { source: "landing_page" };
   if (auth?.user_id) body.user_id = auth.user_id;
+  // Pass the auth token so the backend links the session to this user
   return apiFetch<SessionResponse>("/api/sessions", {
     method: "POST",
     body: JSON.stringify(body),
-  });
+  }, auth?.access_token ?? undefined);
 }
 
 export async function fetchCustomerSessions(token: string): Promise<AdminSession[]> {

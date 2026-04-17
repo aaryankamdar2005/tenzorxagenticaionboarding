@@ -41,8 +41,8 @@ export default function AdminSessionsPage() {
         </div>
       </header>
 
-      <div className="max-w-7xl mx-auto px-8 py-10">
-        <div className="flex items-center justify-between mb-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-8 py-6 sm:py-10">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
            <h2 className="text-sm font-bold uppercase tracking-widest text-slate-400">Master Session Log</h2>
            <div className="flex gap-2">
              <div className="relative">
@@ -55,9 +55,11 @@ export default function AdminSessionsPage() {
            </div>
         </div>
 
-        {/* Audit List Table */}
+        {/* Audit List — table on large, cards on small */}
         <div className="rounded-2xl border border-border-subtle bg-white shadow-sm overflow-hidden">
-          <table className="w-full text-left border-collapse">
+          {/* Desktop table */}
+          <div className="hidden sm:block overflow-x-auto">
+            <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-slate-50 border-b border-border-subtle">
                 <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-slate-500">Session ID</th>
@@ -121,7 +123,34 @@ export default function AdminSessionsPage() {
                 </tr>
               ))}
             </tbody>
-          </table>
+            </table>
+          </div>{/* end hidden sm:block */}
+
+          {/* Mobile cards */}
+          <div className="sm:hidden divide-y divide-slate-100">
+            {loading ? (
+              Array.from({ length: 5 }).map((_, i) => (
+                <div key={i} className="p-4 animate-pulse"><div className="h-3 bg-slate-100 rounded w-full" /></div>
+              ))
+            ) : error ? (
+              <div className="p-6 text-center text-red-600 text-sm">{error}</div>
+            ) : sessions.length === 0 ? (
+              <div className="p-8 text-center text-slate-400 text-sm">No archive data available.</div>
+            ) : sessions.map((s) => (
+              <div key={s.session_id} className="p-4 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase ${
+                    s.review_status === "APPROVED" ? "bg-emerald-50 text-emerald-700" :
+                    s.review_status === "REJECTED" ? "bg-red-50 text-red-700" : "bg-slate-100 text-slate-600"
+                  }`}>{s.review_status || "Logged"}</span>
+                  <Link href={`/admin/dashboard?sid=${s.session_id}`} className="text-xs font-bold text-blue-600 hover:underline">View File →</Link>
+                </div>
+                <p className="font-semibold text-slate-900 text-sm">{s.latest_extraction?.full_name || s.customer_name || "Anonymous"}</p>
+                <p className="text-[10px] font-mono text-slate-400">{s.session_id}</p>
+                <p className="text-[10px] text-slate-400">{s.created_at ? new Date(s.created_at).toLocaleString("en-IN") : "—"}</p>
+              </div>
+            ))}
+          </div>
         </div>
 
         {/* Pagination */}
