@@ -18,10 +18,12 @@ async def compute_and_save_final_score(session_id: str) -> AuditScore:
     """
     Fetch all session signals from MongoDB, run AI scoring, and persist.
     """
+    print(f"=== [AI SCORING] Starting compute_and_save_final_score for session: {session_id} ===")
     db = get_database()
     doc = await db["sessions"].find_one({"session_id": session_id})
 
     if not doc:
+        print(f"=== [AI SCORING] Session document NOT FOUND in db ===")
         logger.warning("compute_final_score: session %s not found", session_id)
         return AuditScore(
             confidence_score=0,
@@ -35,6 +37,8 @@ async def compute_and_save_final_score(session_id: str) -> AuditScore:
     doc_verify: dict = doc.get("document_verification") or {}
     geo: dict = doc.get("geo_result") or {}
 
+    print(f"=== [AI SCORING] Inputs retrieved. KYC fields count: {len(kyc_fields)} ===")
+
     score = await generate_final_score(
         kyc_fields=kyc_fields,
         avg_age=avg_age,
@@ -43,6 +47,8 @@ async def compute_and_save_final_score(session_id: str) -> AuditScore:
         geo_mismatch=geo.get("is_mismatch", False),
         stress_flag=kyc_fields.get("stress_flag", False),
     )
+
+    print(f"=== [AI SCORING] Result from generate_final_score: confidence_score={score.confidence_score}, recommendation={score.approval_recommendation} ===")
 
     # Persist final score into the session document
     await db["sessions"].update_one(
@@ -66,4 +72,5 @@ async def compute_and_save_final_score(session_id: str) -> AuditScore:
         },
     )
 
+    print(f"=== [AI SCORING] Completed and saved final score ===")
     return score

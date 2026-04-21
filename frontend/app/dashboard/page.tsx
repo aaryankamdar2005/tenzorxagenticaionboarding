@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { clearAuth, createSession, fetchCustomerSessions, loadAuth } from "../../lib/api";
+import { clearAuth, createSession, fetchCustomerSessions, loadAuth, fetchMe, fetchEligibility } from "../../lib/api";
 import { AdminSession } from "../../lib/types";
 import { 
   ShieldCheck, LogOut, Plus, FileText, CheckCircle2, XCircle, 
@@ -17,11 +17,30 @@ export default function CustomerDashboard() {
   const [loading, setLoading] = useState(true);
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [ineligibleReason, setIneligibleReason] = useState<string | null>(null);
 
   useEffect(() => {
     const a = loadAuth();
     setAuth(a);
     if (!a || a.role !== "customer") { router.replace("/login"); return; }
+    
+    fetchMe(a.access_token).then(async (me) => {
+      if (me.pan_number) {
+         try {
+           const res = await fetchEligibility(me.pan_number);
+           if (res._status === 403 || !res.eligible) {
+             if (res.reason === "COOLING_OFF_PERIOD") {
+               setIneligibleReason(`Application Cooling-Off Period: Profile is in a mandatory cooling-off period. Please try again in ${res.days_remaining} days.`);
+             } else if (res.reason === "EXCESSIVE_INQUIRIES") {
+               setIneligibleReason("Excessive Credit Inquiries: We have detected multiple recent credit inquiries. To protect your credit score, we cannot process a new application at this time.");
+             } else {
+               setIneligibleReason("Application Rejected: We cannot process your application at this time based on regulatory rules.");
+             }
+           }
+         } catch(e) { console.error("Failed to fetch eligibility", e); }
+      }
+    }).catch(e => console.log(e));
+
     fetchCustomerSessions(a.access_token)
       .then(setSessions)
       .catch(e => setError(e?.message ?? "Connection interrupted"))
@@ -73,12 +92,21 @@ export default function CustomerDashboard() {
            </div>
            <button 
               onClick={startNew} 
-              disabled={starting}
-              className="flex items-center justify-center gap-2 bg-brand-blue text-white px-8 py-4 rounded-full font-bold shadow-lg hover:bg-blue-700 transition active:scale-95 disabled:opacity-50"
+              disabled={starting || !!ineligibleReason}
+              className="flex items-center justify-center gap-2 bg-brand-blue text-white px-8 py-4 rounded-full font-bold shadow-lg hover:bg-blue-700 transition active:scale-95 disabled:opacity-50 disabled:bg-slate-300 disabled:text-slate-500 disabled:shadow-none"
            >
               {starting ? "Initializing..." : <><Plus size={20} /> New Application</>}
            </button>
         </div>
+
+        {ineligibleReason && (
+          <div className="mb-8 p-6 bg-red-50 border-l-4 border-red-500 rounded-r-2xl shadow-sm">
+            <div className="flex items-center gap-3 text-red-700 font-bold mb-2">
+               <ShieldCheck size={20} /> Regulatory Hold Active
+            </div>
+            <p className="text-sm text-red-600/90 leading-relaxed font-medium">{ineligibleReason}</p>
+          </div>
+        )}
 
         {/* Dash Summary */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">

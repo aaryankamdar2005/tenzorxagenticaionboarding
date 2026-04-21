@@ -67,6 +67,7 @@ def compute_underwriting(
     historical_defaults: bool,
     active_trade_lines: int,
     verified_income_ocr: float | None,
+    active_loans_monthly_emi: float = 0.0,
 ) -> UnderwritingResult:
     """
     Full 3Cs underwriting decision.
@@ -78,11 +79,21 @@ def compute_underwriting(
     stated_income = kyc.income_declaration or 0.0
     monthly_emis = kyc.monthly_emi_obligations or 0.0
 
-    # ── Capacity: DTI Ratio ───────────────────────────────────────────────────
+    # ── Capacity: DTI Ratio (Self-declared) ───────────────────────────────────
     if stated_income > 0:
         dti_ratio = (monthly_emis / stated_income) * 100
     else:
         dti_ratio = 100.0   # no income = infinite DTI
+
+    # ── FOIR Enforcement ──────────────────────────────────────────────────────
+    proposed_new_loan_emi = 5000.0  # Estimated standard EMI for base loan
+    total_monthly_debt = active_loans_monthly_emi + proposed_new_loan_emi
+    verified_monthly_income = verified_income_ocr if verified_income_ocr else stated_income
+    
+    if verified_monthly_income > 0:
+        foir_ratio = (total_monthly_debt / verified_monthly_income) * 100
+    else:
+        foir_ratio = 100.0
 
     # ── Income verification against OCR bank statement ────────────────────────
     if verified_income_ocr and stated_income > 0:
@@ -101,6 +112,8 @@ def compute_underwriting(
         income_status = "MISSING"
 
     # ── REJECT rules ──────────────────────────────────────────────────────────
+    if foir_ratio > 50.0:
+        reject_reasons.append(f"FOIR_EXCEEDED: >50% (Calculated FOIR: {foir_ratio:.1f}%)")
     if cibil_score < CIBIL_REJECT_CEILING:
         reject_reasons.append(f"CIBIL score {cibil_score} is below minimum threshold of {CIBIL_REJECT_CEILING}")
     if dti_ratio > DTI_REJECT_FLOOR:
@@ -209,6 +222,7 @@ async def run_full_underwriting_and_save(
         historical_defaults=bureau_data.get("historical_defaults", True),
         active_trade_lines=bureau_data.get("active_trade_lines", 0),
         verified_income_ocr=verified_income_ocr,
+        active_loans_monthly_emi=bureau_data.get("active_loans_monthly_emi", 0.0),
     )
     offer = underwriting_to_offer(uw)
 

@@ -310,15 +310,26 @@ Automated Fraud Signals:
         "max_tokens": 300,
     }
 
+    print(f"=== [AI SCORING] Sending prompt to Groq. Context snippet: {context[:100]}... ===")
+    
     async with httpx.AsyncClient(timeout=30) as client:
-        resp = await client.post(
-            f"{GROQ_API_BASE}/chat/completions",
-            headers=_headers(),
-            json=body,
-        )
-        resp.raise_for_status()
-        content = resp.json()["choices"][0]["message"]["content"]
-        return AuditScore.model_validate(json.loads(content))
+        try:
+            resp = await client.post(
+                f"{GROQ_API_BASE}/chat/completions",
+                headers=_headers(),
+                json=body,
+            )
+            resp.raise_for_status()
+            content = resp.json()["choices"][0]["message"]["content"]
+            print(f"=== [AI SCORING] Raw Response from Groq: {content} ===")
+            return AuditScore.model_validate(json.loads(content))
+        except Exception as e:
+            print(f"=== [AI SCORING] ERROR calling Groq: {e} ===")
+            return AuditScore(
+                confidence_score=0,
+                approval_recommendation="MANUAL_REVIEW",
+                reasons=[f"Error calling LLM: {str(e)}"],
+            )
 
 
 # ── Legacy alias ──────────────────────────────────────────────────────────────

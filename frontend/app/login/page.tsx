@@ -11,6 +11,7 @@ export default function CustomerLoginPage() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [pan, setPan] = useState("");
   const [showPw, setShowPw] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -22,7 +23,7 @@ export default function CustomerLoginPage() {
     try {
       const token = mode === "login"
         ? await loginUser(email, password)
-        : await registerUser(name, email, password, "customer");
+        : await registerUser(name, email, password, "customer", pan);
       if (token.role !== "customer") {
         setError("This portal is for customers only. Bankers must use the Banker Portal.");
         return;
@@ -128,19 +129,35 @@ export default function CustomerLoginPage() {
 
               <form onSubmit={handle} className="space-y-4">
                 {mode === "register" && (
-                  <div>
-                    <label htmlFor="customer-name" className="block text-sm font-semibold text-slate-700 mb-1.5">
-                      Full Name
-                    </label>
-                    <input
-                      id="customer-name"
-                      value={name}
-                      onChange={e => setName(e.target.value)}
-                      required
-                      placeholder="Rahul Sharma"
-                      className="w-full rounded-xl border-2 border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 outline-none focus:border-blue-500 transition font-medium"
-                    />
-                  </div>
+                  <>
+                    <div>
+                      <label htmlFor="customer-name" className="block text-sm font-semibold text-slate-700 mb-1.5">
+                        Full Name
+                      </label>
+                      <input
+                        id="customer-name"
+                        value={name}
+                        onChange={e => setName(e.target.value)}
+                        required
+                        placeholder="Rahul Sharma"
+                        className="w-full rounded-xl border-2 border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 outline-none focus:border-blue-500 transition font-medium"
+                      />
+                    </div>
+                    <div>
+                      <label htmlFor="customer-pan" className="block text-sm font-semibold text-slate-700 mb-1.5">
+                        Permanent Account Number (PAN)
+                      </label>
+                      <input
+                        id="customer-pan"
+                        value={pan}
+                        onChange={e => setPan(e.target.value.toUpperCase())}
+                        required
+                        maxLength={10}
+                        placeholder="ABCDE1234F"
+                        className="w-full rounded-xl border-2 border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 outline-none focus:border-blue-500 transition font-medium uppercase"
+                      />
+                    </div>
+                  </>
                 )}
 
                 <div>

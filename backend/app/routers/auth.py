@@ -46,6 +46,7 @@ async def register(body: UserRegisterRequest):
         "email": body.email.lower(),
         "password_hash": hash_password(body.password),
         "role": body.role.value,
+        "pan_number": body.pan_number.upper() if body.pan_number else None,
         "created_at": utc_now(),
     }
     result = await db["users"].insert_one(doc)
@@ -78,5 +79,14 @@ async def login(body: UserLoginRequest):
 
 @router.get("/me")
 async def me(current_user: dict = Depends(get_current_user)):
-    return {"user_id": current_user["sub"], "email": current_user["email"],
-            "role": current_user["role"], "name": current_user["name"]}
+    db = get_database()
+    user = await db["users"].find_one({"_id": ObjectId(current_user["sub"])})
+    pan = user.get("pan_number") if user else None
+
+    return {
+        "user_id": current_user["sub"],
+        "email": current_user["email"],
+        "role": current_user["role"],
+        "name": current_user["name"],
+        "pan_number": pan
+    }

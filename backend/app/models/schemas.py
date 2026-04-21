@@ -99,6 +99,7 @@ class UserRegisterRequest(BaseModel):
     email: str
     password: str
     role: UserRole = UserRole.CUSTOMER
+    pan_number: str | None = None
 
 
 class UserLoginRequest(BaseModel):
@@ -122,6 +123,10 @@ class BureauReport(BaseModel):
     active_trade_lines: int
     historical_defaults: bool
     report_date: str
+    last_application_date: str | None = None
+    last_application_status: str | None = None
+    recent_hard_inquiries: int = 0
+    active_loans_monthly_emi: float = 0.0
 
 
 # ── Underwriting ──────────────────────────────────────────────────────────────

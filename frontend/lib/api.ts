@@ -16,11 +16,14 @@ async function apiFetch<T>(path: string, options?: RequestInit, token?: string):
 // ── Auth ──────────────────────────────────────────────────────────────────────
 
 export async function registerUser(
-  name: string, email: string, password: string, role: "customer" | "banker"
+  name: string, email: string, password: string, role: "customer" | "banker", pan_number?: string
 ): Promise<AuthToken> {
+  const body: any = { name, email, password, role };
+  if (pan_number) body.pan_number = pan_number;
+  
   return apiFetch<AuthToken>("/api/auth/register", {
     method: "POST",
-    body: JSON.stringify({ name, email, password, role }),
+    body: JSON.stringify(body),
   });
 }
 
@@ -46,6 +49,10 @@ export function loadAuth(): AuthToken | null {
 
 export function clearAuth() {
   if (typeof window !== "undefined") localStorage.removeItem("auth_token");
+}
+
+export async function fetchMe(token: string): Promise<{ pan_number: string | null; name: string; email: string }> {
+  return apiFetch<{ pan_number: string | null; name: string; email: string }>("/api/auth/me", {}, token);
 }
 
 // ── Session management ────────────────────────────────────────────────────────
@@ -93,6 +100,13 @@ export async function extractDocument(
 
 export async function fetchBureauReport(panNumber: string): Promise<BureauReport> {
   return apiFetch<BureauReport>(`/api/bureau/credit-report/${encodeURIComponent(panNumber)}`);
+}
+
+export async function fetchEligibility(panNumber: string): Promise<{ eligible: boolean; reason?: string; days_remaining?: number; _status?: number }> {
+  // Use regular fetch directly instead of apiFetch because it might return 403 gracefully
+  const res = await fetch(`${API_URL}/api/bureau/eligibility/pre-check/${encodeURIComponent(panNumber)}`);
+  const data = await res.json().catch(() => ({ eligible: false }));
+  return { ...data, _status: res.status };
 }
 
 // ── Admin API ─────────────────────────────────────────────────────────────────
