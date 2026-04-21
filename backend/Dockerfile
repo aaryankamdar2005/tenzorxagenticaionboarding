@@ -2,7 +2,7 @@ FROM python:3.12-slim
 
 # Install system dependencies for OCR (EasyOCR/Tesseract)
 RUN apt-get update && apt-get install -y \
-    libgl1-mesa-glx \
+    libgl1 \
     libglib2.0-0 \
     tesseract-ocr \
     && rm -rf /var/lib/apt/lists/*
