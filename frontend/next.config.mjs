@@ -12,6 +12,9 @@ const nextConfig = {
         fs: false,
         path: false,
         crypto: false,
+        "node-fetch": false,
+        net: false,
+        tls: false,
       };
     }
     return config;
