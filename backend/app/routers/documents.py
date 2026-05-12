@@ -92,10 +92,9 @@ def _run_tesseract(image_bytes: bytes) -> str:
 
 
 def _run_ocr(image_bytes: bytes) -> str:
-    text = _run_easyocr(image_bytes)
-    if not text:
-        text = _run_tesseract(image_bytes)
-    return text
+    # Disable EasyOCR by default to prevent OOM kills on low-RAM containers like Render.
+    # Tesseract is pre-installed in the Docker container and uses a fraction of the RAM.
+    return _run_tesseract(image_bytes)
 
 
 # ── Fuzzy matching helper ─────────────────────────────────────────────────────
