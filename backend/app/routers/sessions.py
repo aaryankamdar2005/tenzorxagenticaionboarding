@@ -65,12 +65,35 @@ async def submit_session(session_id: str) -> dict:
     from app.services.decision_engine import compute_and_save_final_score
 
     db = get_database()
+    session = await db["sessions"].find_one({"session_id": session_id})
+    if not session:
+        raise HTTPException(404, "Session not found")
+
+    customer_name = session.get("customer_name", "").strip().lower()
+    extracted_name = session.get("latest_extraction", {}).get("full_name", "").strip().lower()
+
+    # Reject if names do not match
+    if customer_name and extracted_name and customer_name != extracted_name:
+        await db["sessions"].update_one(
+            {"session_id": session_id},
+            {"$set": {
+                "state": "REJECTED",
+                "review_status": "REJECTED",
+                "submitted_at": utc_now(),
+                "final_score": {
+                    "confidence_score": 0,
+                    "approval_recommendation": "REJECTED",
+                    "reasons": [f"Name mismatch: Registered account name '{session.get('customer_name')}' does not match KYC document name '{session.get('latest_extraction', {}).get('full_name')}'."]
+                }
+            }}
+        )
+        await log_event("audit_logs", {"session_id": session_id, "event": "SESSION_AUTO_REJECTED"})
+        return {"status": "rejected", "reason": "Name mismatch"}
+
     result = await db["sessions"].update_one(
         {"session_id": session_id},
         {"$set": {"state": "SUBMITTED", "submitted_at": utc_now()}}
     )
-    if result.matched_count == 0:
-        raise HTTPException(404, "Session not found")
 
     await log_event("audit_logs", {"session_id": session_id, "event": "SESSION_SUBMITTED"})
 

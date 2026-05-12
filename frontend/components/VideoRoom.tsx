@@ -360,7 +360,7 @@ export default function VideoRoom({ sessionId }: { sessionId: string }) {
   const db = docBadge();
 
   return (
-    <div className="min-h-screen bg-slate-100 text-slate-900 pt-4 pb-10 px-3 sm:pt-6 sm:px-6">
+    <div className="font-sans px-4 sm:px-8 pt-4 pb-20">
 
       {/* ── Camera/Mic Permission Gate ───────────────────────────────────────── */}
       {mediaPermission !== "granted" && (
@@ -474,12 +474,12 @@ export default function VideoRoom({ sessionId }: { sessionId: string }) {
         {/* ── Header ── */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5 sm:mb-8">
           <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-xl bg-blue-600 text-white shrink-0">
-              <ShieldCheck size={20} />
+            <div className="flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-2xl bg-brand-blue/20 border border-brand-blue/30 text-brand-blue shrink-0 shadow-[0_0_15px_rgba(59,130,246,0.3)]">
+              <ShieldCheck size={24} />
             </div>
             <div>
-              <p className="text-[9px] sm:text-[10px] font-bold uppercase tracking-widest text-slate-500">SecureBank Core</p>
-              <h1 className="text-lg sm:text-xl font-bold text-slate-900">Identity Verification Session</h1>
+              <p className="text-[9px] sm:text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-0.5">SecureBank Core</p>
+              <h1 className="text-lg sm:text-2xl font-bold tracking-tight text-slate-900 dark:text-white leading-none">Identity Verification Session</h1>
             </div>
           </div>
           <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
@@ -489,7 +489,7 @@ export default function VideoRoom({ sessionId }: { sessionId: string }) {
                 <span className="text-[10px] font-bold uppercase tracking-widest">Age: {detectedAge}Y</span>
               </div>
             )}
-            <div className={`flex items-center gap-2 rounded-full px-3 py-1.5 border text-xs sm:text-[10px] ${isRecording ? "bg-emerald-100 border-emerald-400 text-emerald-800" : "bg-white border-slate-300 text-slate-600"}`}>
+            <div className={`flex items-center gap-2 rounded-full px-4 py-2 border text-xs sm:text-[10px] backdrop-blur-md ${isRecording ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-500" : "bg-white/5 border-white/10 text-slate-500 dark:text-slate-300"}`}>
               <div className={`h-2 w-2 rounded-full shrink-0 ${isRecording ? "bg-emerald-500 animate-pulse" : "bg-slate-400"}`} />
               <span className="font-bold uppercase tracking-widest">{isRecording ? "Listening" : "Connected"}</span>
             </div>
@@ -530,7 +530,7 @@ export default function VideoRoom({ sessionId }: { sessionId: string }) {
           {/* ── Left: Video + Transcript ── */}
           <div className="lg:col-span-8 flex flex-col gap-4 sm:gap-6">
             {/* Video */}
-            <div className="relative aspect-video overflow-hidden rounded-xl sm:rounded-2xl bg-slate-900 shadow-lg border border-slate-300">
+            <div className="relative aspect-video overflow-hidden rounded-[2rem] sm:rounded-[3rem] bg-slate-950 shadow-2xl border border-white/10 ring-1 ring-white/5">
               <video ref={videoRef} autoPlay playsInline muted className="h-full w-full object-cover" />
               <canvas ref={canvasRef} className="absolute inset-0 pointer-events-none" />
 
@@ -556,10 +556,10 @@ export default function VideoRoom({ sessionId }: { sessionId: string }) {
               <div className="absolute inset-x-0 bottom-6 flex justify-center px-6">
                 <button
                   onPointerDown={startRec} onPointerUp={stopRec} onPointerLeave={stopRec}
-                  className={`flex items-center gap-3 rounded-full px-8 py-4 font-bold shadow-xl transition-all active:scale-95 ${
+                  className={`flex items-center gap-3 rounded-full px-8 py-4 font-bold shadow-[0_0_30px_rgba(0,0,0,0.5)] transition-all active:scale-95 border backdrop-blur-md ${
                     isRecording
-                      ? "bg-red-600 text-white scale-105"
-                      : "bg-white text-slate-900 hover:bg-slate-50 border border-slate-200"
+                      ? "bg-red-500/20 text-red-400 border-red-500/50 scale-105"
+                      : "bg-white/10 text-white border-white/20 hover:bg-white/20"
                   }`}
                 >
                   <Mic size={20} />
@@ -568,8 +568,12 @@ export default function VideoRoom({ sessionId }: { sessionId: string }) {
               </div>
 
               {/* Age HUD tag */}
-              <div className="absolute top-4 left-4">
-                <div className="rounded-full bg-slate-900/70 backdrop-blur-md px-3 py-1.5 border border-white/20 text-[10px] font-bold text-white flex items-center gap-2">
+              <div className="absolute top-6 left-6 flex gap-3">
+                <div className="rounded-full bg-red-600/90 backdrop-blur-md px-4 py-2 border border-white/20 text-[10px] font-black tracking-widest uppercase text-white flex items-center gap-2 shadow-[0_0_15px_rgba(220,38,38,0.5)]">
+                  <div className="h-2 w-2 rounded-full bg-white animate-pulse" />
+                  LIVE
+                </div>
+                <div className="hidden sm:flex rounded-full bg-slate-900/70 backdrop-blur-md px-4 py-2 border border-white/20 text-[10px] font-bold text-white items-center gap-2 shadow-lg">
                   <div className={`h-1.5 w-1.5 rounded-full ${modelsLoaded ? "bg-emerald-400" : "bg-amber-400 animate-pulse"}`} />
                   {modelsLoaded ? (detectedAge ? `Age: ${detectedAge}Y` : "Detecting face...") : "Loading models..."}
                 </div>
@@ -589,19 +593,19 @@ export default function VideoRoom({ sessionId }: { sessionId: string }) {
             </div>
 
             {/* Transcript Console */}
-            <div className="rounded-xl sm:rounded-2xl bg-white border border-slate-200 shadow-sm overflow-hidden flex flex-col h-44 sm:h-52">
-              <div className="bg-slate-50 px-4 sm:px-6 py-3 border-b border-slate-200 flex items-center justify-between">
-                <div className="flex items-center gap-2 text-slate-700 font-bold uppercase tracking-widest text-[10px]">
-                  <MessageSquare size={12} /> Live Support Assistant
+            <div className="glass-panel rounded-3xl overflow-hidden flex flex-col h-44 sm:h-52 mt-2 shadow-sm">
+              <div className="bg-white/5 px-4 sm:px-6 py-3 border-b border-white/10 flex items-center justify-between backdrop-blur-md">
+                <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400 font-bold uppercase tracking-widest text-[10px]">
+                  <MessageSquare size={12} /> Aria Assistant
                 </div>
                 {isRecording && (
                   <span className="flex gap-1">
-                    <span className="h-2 w-2 rounded-full bg-blue-600 animate-bounce" />
-                    <span className="h-2 w-2 rounded-full bg-blue-600 animate-bounce [animation-delay:0.2s]" />
+                    <span className="h-2 w-2 rounded-full bg-brand-blue animate-bounce" />
+                    <span className="h-2 w-2 rounded-full bg-brand-blue animate-bounce [animation-delay:0.2s]" />
                   </span>
                 )}
               </div>
-              <div className="p-4 sm:p-6 overflow-y-auto flex-1 space-y-4">
+              <div className="p-4 sm:p-6 overflow-y-auto flex-1 space-y-4 custom-scrollbar">
                 <AnimatePresence mode="popLayout">
                   {lastAgentMsg && (
                     <motion.div 
@@ -610,9 +614,9 @@ export default function VideoRoom({ sessionId }: { sessionId: string }) {
                       animate={{ opacity: 1, y: 0 }} 
                       className="flex gap-3"
                     >
-                      <div className="shrink-0 h-8 w-8 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-xs">A</div>
+                      <div className="shrink-0 h-8 w-8 rounded-full bg-brand-blue/20 text-brand-blue border border-brand-blue/30 flex items-center justify-center font-bold text-xs">A</div>
                       <div>
-                        <p className="text-sm font-semibold text-slate-900 leading-relaxed">{lastAgentMsg.text}</p>
+                        <p className="text-sm font-semibold text-slate-900 dark:text-white leading-relaxed">{lastAgentMsg.text}</p>
                       </div>
                     </motion.div>
                   )}
@@ -623,16 +627,16 @@ export default function VideoRoom({ sessionId }: { sessionId: string }) {
                       animate={{ opacity: 1, y: 0 }} 
                       className="flex gap-3 flex-row-reverse"
                     >
-                      <div className="shrink-0 h-8 w-8 rounded-full bg-slate-200 text-slate-700 flex items-center justify-center font-bold text-xs">U</div>
+                      <div className="shrink-0 h-8 w-8 rounded-full bg-slate-900/10 dark:bg-slate-800/40 text-slate-700 dark:text-slate-300 border border-slate-300/20 dark:border-slate-700/50 flex items-center justify-center font-bold text-xs">U</div>
                       <div className="text-right">
-                        <p className="text-sm italic text-slate-700 leading-relaxed">{lastUserMsg.text}</p>
+                        <p className="text-sm italic text-slate-700 dark:text-slate-400 leading-relaxed">{lastUserMsg.text}</p>
                       </div>
                     </motion.div>
                   )}
                 </AnimatePresence>
                 {!lastAgentMsg && !lastUserMsg && (
-                  <div className="h-full flex items-center justify-center text-slate-400 text-xs gap-2">
-                    <Info size={14} /> Establishing secure communication...
+                  <div className="h-full flex items-center justify-center text-slate-400/50 text-xs gap-2 font-bold uppercase tracking-widest">
+                    <Info size={14} /> Establishing Secure Comms...
                   </div>
                 )}
               </div>
@@ -643,9 +647,9 @@ export default function VideoRoom({ sessionId }: { sessionId: string }) {
           <div className="lg:col-span-4 flex flex-col gap-4 sm:gap-5">
 
             {/* KYC Fields */}
-            <div className="rounded-xl sm:rounded-2xl bg-white border border-slate-200 p-4 sm:p-6 shadow-sm">
-              <h3 className="mb-3 sm:mb-4 flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-slate-600">
-                <BadgeCheck size={14} className="text-blue-600" /> KYC Information
+            <div className="glass-panel rounded-3xl p-4 sm:p-6 shadow-sm">
+              <h3 className="mb-4 flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-slate-500">
+                <BadgeCheck size={16} className="text-brand-blue" /> KYC Information
               </h3>
               <div className="space-y-2">
                 {[
@@ -659,9 +663,9 @@ export default function VideoRoom({ sessionId }: { sessionId: string }) {
                   ["Loan Purpose",    kycFields.loan_purpose],
                   ["Est. Age (Face)", detectedAge ? `${detectedAge} years` : null],
                 ].map(([label, val]) => (
-                  <div key={label as string} className="flex items-center justify-between py-2 border-b border-slate-100 last:border-0">
-                    <span className="text-xs text-slate-500 font-medium">{label}</span>
-                    <span className={`text-xs font-bold ${val ? "text-slate-900" : "text-slate-300"}`}>
+                  <div key={label as string} className="flex items-center justify-between py-2.5 border-b border-slate-300/10 dark:border-slate-700/30 last:border-0">
+                    <span className="text-[10px] uppercase tracking-widest font-bold text-slate-500">{label}</span>
+                    <span className={`text-xs font-bold ${val ? "text-slate-900 dark:text-slate-300" : "text-slate-400"}`}>
                       {val || "—"}
                     </span>
                   </div>
@@ -670,9 +674,9 @@ export default function VideoRoom({ sessionId }: { sessionId: string }) {
             </div>
 
             {/* Security Checks */}
-            <div className="rounded-xl sm:rounded-2xl bg-white border border-slate-200 p-4 sm:p-6 shadow-sm">
-              <h3 className="mb-4 flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-slate-600">
-                <CheckCircle size={14} className="text-blue-600" /> Security Checks
+            <div className="glass-panel rounded-3xl p-4 sm:p-6 shadow-sm">
+              <h3 className="mb-6 flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-slate-500">
+                <CheckCircle size={16} className="text-brand-blue" /> Security Checks
               </h3>
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
@@ -696,18 +700,18 @@ export default function VideoRoom({ sessionId }: { sessionId: string }) {
             {/* Action Buttons */}
             <div className="flex flex-col gap-3">
               <button onClick={() => setShowMultiDoc(true)}
-                className="w-full rounded-xl bg-blue-600 py-3 sm:py-3.5 text-sm font-bold text-white hover:bg-blue-700 transition shadow-sm">
+                className="glass-button w-full rounded-2xl bg-brand-blue/10 border-brand-blue/30 text-brand-blue py-3.5 text-xs font-bold uppercase tracking-widest hover:bg-brand-blue/20 transition shadow-sm">
                 Verify Proof of Identity
               </button>
               <button
                 onClick={startLiveness}
                 disabled={liveness.passed === true || liveness.active}
-                className={`w-full rounded-xl py-3.5 text-sm font-bold transition border ${
+                className={`glass-button w-full rounded-2xl py-3.5 text-xs font-bold uppercase tracking-widest transition ${
                   liveness.passed === true
-                    ? "bg-emerald-50 border-emerald-300 text-emerald-700 cursor-default"
+                    ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-500 cursor-default"
                     : liveness.active
-                    ? "bg-slate-50 border-slate-200 text-slate-400 cursor-wait"
-                    : "bg-white border-blue-600 text-blue-600 hover:bg-blue-50"
+                    ? "bg-slate-500/5 border-slate-500/20 text-slate-500 cursor-wait"
+                    : "bg-brand-blue/10 border-brand-blue/30 text-brand-blue hover:bg-brand-blue/20"
                 }`}
               >
                 {liveness.active ? "Challenge Active..." : liveness.passed === true ? "✓ Biometric Passed" : "Initiate Biometric Check"}
@@ -717,12 +721,12 @@ export default function VideoRoom({ sessionId }: { sessionId: string }) {
               <button
                 onClick={submitForReview}
                 disabled={submitStatus === "done" || submitStatus === "loading"}
-                className={`w-full rounded-xl py-3.5 text-sm font-bold transition flex items-center justify-center gap-2 ${
+                className={`w-full rounded-2xl py-4 text-xs font-bold uppercase tracking-widest transition flex items-center justify-center gap-2 ${
                   submitStatus === "done"
-                    ? "bg-emerald-100 border border-emerald-300 text-emerald-800 cursor-default"
+                    ? "bg-emerald-500/10 border border-emerald-500/30 text-emerald-500 cursor-default"
                     : submitStatus === "error"
-                    ? "bg-red-600 text-white hover:bg-red-700"
-                    : "bg-slate-900 text-white hover:bg-slate-800 shadow-sm"
+                    ? "bg-red-500/10 border border-red-500/30 text-red-500"
+                    : "bg-brand-blue text-white shadow-[0_0_20px_rgba(59,130,246,0.3)] hover:bg-blue-500 border border-transparent"
                 }`}
               >
                 {submitStatus === "loading" && <Loader2 size={16} className="animate-spin" />}
@@ -744,43 +748,11 @@ export default function VideoRoom({ sessionId }: { sessionId: string }) {
             )}
 
             {/* ── Loan Offer Card ──────────────────────────── */}
-            {offer && (
-              <div className={`rounded-xl sm:rounded-2xl border p-4 sm:p-5 ${
-                offer.status === "APPROVED" ? "bg-blue-50 border-blue-200"
-                : offer.status === "REJECTED" ? "bg-red-50 border-red-200"
-                : "bg-slate-50 border-slate-200"
-              }`}>
-                <h3 className="mb-3 flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-slate-600">
-                  <BadgeCheck size={13} className="text-blue-600" /> Loan Offer Details
-                </h3>
-                <div className={`rounded-lg px-3 py-2 text-center text-xs font-bold mb-3 ${
-                  offer.status === "APPROVED" ? "bg-blue-600 text-white"
-                  : offer.status === "REJECTED" ? "bg-red-600 text-white"
-                  : "bg-amber-500 text-white"
-                }`}>{String(offer.status)}</div>
-                {offer.amount && (
-                  <div className="grid grid-cols-3 gap-2">
-                    <div className="text-center bg-white rounded-lg border border-slate-200 p-2">
-                      <p className="text-[9px] text-slate-500 font-medium uppercase">Amount</p>
-                      <p className="text-xs font-black text-slate-900">₹{Number(offer.amount).toLocaleString()}</p>
-                    </div>
-                    {offer.roi && <div className="text-center bg-white rounded-lg border border-slate-200 p-2">
-                      <p className="text-[9px] text-slate-500 font-medium uppercase">Rate</p>
-                      <p className="text-xs font-black text-slate-900">{offer.roi}%</p>
-                    </div>}
-                    {offer.tenure_months && <div className="text-center bg-white rounded-lg border border-slate-200 p-2">
-                      <p className="text-[9px] text-slate-500 font-medium uppercase">Tenure</p>
-                      <p className="text-xs font-black text-slate-900">{offer.tenure_months}mo</p>
-                    </div>}
-                  </div>
-                )}
-                {offer.reason && <p className="mt-2 text-[10px] text-slate-500">{offer.reason}</p>}
-              </div>
-            )}
+            {/* Removed: Offer details will only be visible on the dashboard after banker approval. */}
 
             {/* Manual Testing Section */}
-            <div className="rounded-xl sm:rounded-2xl bg-white border border-dashed border-slate-300 p-4 sm:p-5">
-              <h4 className="mb-3 text-[10px] font-bold uppercase tracking-wider text-slate-600 flex items-center gap-2">
+            <div className="glass-panel rounded-3xl border border-dashed border-slate-300/50 dark:border-slate-700/50 p-4 sm:p-5 mt-4">
+              <h4 className="mb-4 text-[9px] font-bold uppercase tracking-widest text-slate-500 flex items-center gap-2">
                 <Clock size={12} /> QA &amp; Manual Testing
               </h4>
               <div className="flex flex-col gap-2.5">
@@ -790,12 +762,12 @@ export default function VideoRoom({ sessionId }: { sessionId: string }) {
                     value={manualText}
                     onChange={(e) => setManualText(e.target.value)}
                     placeholder="Type manual answer..."
-                    className="flex-1 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                    className="flex-1 rounded-xl bg-slate-900/5 dark:bg-slate-900/40 border border-slate-300/30 dark:border-slate-700/50 px-4 py-2 text-xs text-slate-900 dark:text-white placeholder:text-slate-500 focus:ring-1 focus:ring-brand-blue outline-none transition-all"
                     onKeyDown={(e) => { if (e.key === "Enter") sendManual(); }}
                   />
                   <button
                     onClick={sendManual}
-                    className="rounded-lg bg-blue-600 px-3 py-2 text-white hover:bg-blue-700 transition flex items-center gap-1 text-xs font-bold"
+                    className="rounded-xl bg-brand-blue px-4 py-2 text-white hover:bg-blue-500 transition shadow-[0_0_10px_rgba(59,130,246,0.2)] flex items-center gap-1 text-xs font-bold"
                   >
                     <Send size={13} />
                   </button>
@@ -803,13 +775,13 @@ export default function VideoRoom({ sessionId }: { sessionId: string }) {
                 <div className="flex gap-2">
                   <button
                     onClick={() => socketRef.current?.send(JSON.stringify({ kind: "manual_transcript", text: "My name is John Doe, I am 32 years old and I work for TechCorp as a software engineer." }))}
-                    className="flex-1 rounded-lg border border-slate-200 bg-slate-50 py-2 text-[10px] font-semibold text-slate-700 hover:bg-slate-100 transition"
+                    className="flex-1 rounded-xl border border-slate-300/30 dark:border-slate-700/50 bg-slate-900/5 dark:bg-slate-900/40 py-2.5 text-[9px] font-bold uppercase tracking-widest text-slate-500 hover:bg-slate-900/10 transition"
                   >
                     Auto Fill Info
                   </button>
                   <button
                     onClick={() => socketRef.current?.send(JSON.stringify({ kind: "manual_transcript", text: "I give my full consent to proceed with this loan application." }))}
-                    className="flex-1 rounded-lg border border-slate-200 bg-slate-50 py-2 text-[10px] font-semibold text-slate-700 hover:bg-slate-100 transition"
+                    className="flex-1 rounded-xl border border-slate-300/30 dark:border-slate-700/50 bg-slate-900/5 dark:bg-slate-900/40 py-2.5 text-[9px] font-bold uppercase tracking-widest text-slate-500 hover:bg-slate-900/10 transition"
                   >
                     Quick Consent
                   </button>

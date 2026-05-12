@@ -126,11 +126,18 @@ export async function fetchSessionDetail(sessionId: string): Promise<AdminSessio
 export async function updateSessionReview(
   sessionId: string,
   action: "APPROVED" | "REJECTED" | "FLAGGED",
-  notes?: string
+  notes?: string,
+  approvedAmount?: number,
+  approvedRoi?: number
 ): Promise<{ ok: boolean; status: string }> {
   return apiFetch(`/api/admin/sessions/${sessionId}/review`, {
     method: "POST",
-    body: JSON.stringify({ action, notes }),
+    body: JSON.stringify({ 
+      action, 
+      notes, 
+      approved_amount: approvedAmount, 
+      approved_roi: approvedRoi 
+    }),
   });
 }
 

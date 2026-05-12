@@ -23,6 +23,8 @@ ReviewAction = Literal["APPROVED", "REJECTED", "FLAGGED"]
 class ReviewPayload(BaseModel):
     action: ReviewAction
     notes: str | None = None
+    approved_amount: int | None = None
+    approved_roi: float | None = None
 
 
 def _serialize(doc: dict) -> dict:
@@ -43,7 +45,7 @@ async def list_sessions(
     db = get_database()
     skip = (page - 1) * limit
     cursor = db["sessions"].find(
-        {},
+        {"submitted_at": {"$exists": True}},
         {
             "session_id": 1,
             "source": 1,
@@ -61,7 +63,7 @@ async def list_sessions(
     ).sort("created_at", -1).skip(skip).limit(limit)
 
     docs = [_serialize(doc) async for doc in cursor]
-    total = await db["sessions"].count_documents({})
+    total = await db["sessions"].count_documents({"submitted_at": {"$exists": True}})
 
     return {"sessions": docs, "total": total, "page": page, "limit": limit}
 
@@ -100,6 +102,24 @@ async def update_review(session_id: str, payload: ReviewPayload) -> dict:
     }
     if payload.notes:
         update["review_notes"] = payload.notes
+        
+    if payload.action == "APPROVED" and (payload.approved_amount is not None or payload.approved_roi is not None):
+        # We update the latest_offer or just set approved values at the root
+        offer_update = {}
+        if payload.approved_amount is not None:
+            update["approved_amount"] = payload.approved_amount
+            offer_update["amount"] = payload.approved_amount
+        if payload.approved_roi is not None:
+            update["approved_roi"] = payload.approved_roi
+            offer_update["roi"] = payload.approved_roi
+            
+        # Optional: also override the latest_offer dictionary so the frontend sees it
+        if offer_update:
+            if "latest_offer" in doc:
+                for k, v in offer_update.items():
+                    update[f"latest_offer.{k}"] = v
+            else:
+                update["latest_offer"] = {"status": "APPROVED", **offer_update}
 
     await db["sessions"].update_one({"session_id": session_id}, {"$set": update})
     await log_event("audit_logs", {

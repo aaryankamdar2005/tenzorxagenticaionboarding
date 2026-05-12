@@ -6,8 +6,8 @@ import { motion } from "framer-motion";
 import { clearAuth, createSession, fetchCustomerSessions, loadAuth, fetchMe, fetchEligibility } from "../../lib/api";
 import { AdminSession } from "../../lib/types";
 import { 
-  ShieldCheck, LogOut, Plus, FileText, CheckCircle2, XCircle, 
-  Clock, ArrowRight, Wallet, BadgeCheck, ExternalLink 
+  ShieldCheck, Plus, FileText, CheckCircle2, XCircle, 
+  Clock, ArrowRight, Wallet, BadgeCheck, ExternalLink, Activity
 } from "lucide-react";
 
 export default function CustomerDashboard() {
@@ -55,169 +55,201 @@ export default function CustomerDashboard() {
     } catch { setStarting(false); }
   };
 
-  const logout = () => { clearAuth(); router.push("/login"); };
-
   return (
-    <div className="min-h-screen bg-bg-primary text-brand-navy font-sans">
-      {/* Institutional Header */}
-      <header className="border-b border-border-subtle bg-white shadow-sm px-8 py-4">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-blue/10 text-brand-blue">
-              <ShieldCheck size={22} />
+    <div className="font-sans px-4 sm:px-8 py-10">
+      {/* Welcome Section - Hero */}
+      <motion.div 
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12 pb-10 border-b border-slate-300/20 dark:border-slate-700/50"
+      >
+         <div>
+            <h2 className="text-4xl font-bold tracking-tight text-slate-900 dark:text-white mb-2">
+              Welcome back, {auth?.name?.split(" ")[0] || "User"}.
+            </h2>
+            <p className="text-sm font-medium text-slate-500 dark:text-slate-400">Your secure digital banking environment.</p>
+         </div>
+         
+         <button 
+            onClick={startNew} 
+            disabled={starting || !!ineligibleReason}
+            className="group relative flex items-center justify-center gap-3 px-8 py-4 rounded-2xl font-bold text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed overflow-hidden"
+         >
+            {/* Glossy Button Base */}
+            <div className="absolute inset-0 bg-brand-blue/80 backdrop-blur-xl border border-white/20 z-0"></div>
+            {/* Hover Aura */}
+            <div className="absolute inset-0 bg-gradient-to-r from-blue-400/50 to-emerald-400/50 opacity-0 group-hover:opacity-100 transition-opacity duration-500 blur-xl z-0"></div>
+            {/* Content */}
+            <div className="relative z-10 flex items-center gap-2">
+              {starting ? (
+                <Activity size={20} className="animate-spin" />
+              ) : (
+                <Plus size={20} />
+              )}
+              {starting ? "Initializing Secure Container..." : "New Application"}
             </div>
-            <div>
-              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 leading-none mb-1">SecureBank Personal</p>
-              <h1 className="text-xl font-bold leading-none">Loans & Onboarding</h1>
-            </div>
-          </div>
-          <div className="flex items-center gap-4">
-            <div className="text-right hidden sm:block">
-               <p className="text-sm font-bold text-brand-navy leading-none mb-1">{auth?.name}</p>
-               <p className="text-[10px] text-slate-400 uppercase tracking-widest leading-none">Verified Customer</p>
-            </div>
-            <button onClick={logout} className="p-2 border border-border-subtle rounded-xl text-slate-400 hover:text-red-500 hover:bg-red-50 transition">
-              <LogOut size={18} />
-            </button>
-          </div>
-        </div>
-      </header>
+         </button>
+      </motion.div>
 
-      <main className="max-w-5xl mx-auto px-8 py-10">
-        {/* Welcome Section */}
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-10 pb-10 border-b border-border-subtle">
-           <div>
-              <h2 className="text-3xl font-bold text-brand-navy mb-2">Welcome back.</h2>
-              <p className="text-slate-500">Manage your loan applications and identity verification sessions here.</p>
-           </div>
-           <button 
-              onClick={startNew} 
-              disabled={starting || !!ineligibleReason}
-              className="flex items-center justify-center gap-2 bg-brand-blue text-white px-8 py-4 rounded-full font-bold shadow-lg hover:bg-blue-700 transition active:scale-95 disabled:opacity-50 disabled:bg-slate-300 disabled:text-slate-500 disabled:shadow-none"
-           >
-              {starting ? "Initializing..." : <><Plus size={20} /> New Application</>}
-           </button>
-        </div>
-
-        {ineligibleReason && (
-          <div className="mb-8 p-6 bg-red-50 border-l-4 border-red-500 rounded-r-2xl shadow-sm">
-            <div className="flex items-center gap-3 text-red-700 font-bold mb-2">
+      {ineligibleReason && (
+        <motion.div 
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="mb-10 p-6 glass-panel border-l-4 border-l-red-500 rounded-2xl shadow-lg relative overflow-hidden"
+        >
+          <div className="absolute top-0 right-0 p-8 opacity-10"><ShieldCheck size={100} className="text-red-500" /></div>
+          <div className="relative z-10">
+            <div className="flex items-center gap-3 text-red-600 dark:text-red-400 font-bold mb-2">
                <ShieldCheck size={20} /> Regulatory Hold Active
             </div>
-            <p className="text-sm text-red-600/90 leading-relaxed font-medium">{ineligibleReason}</p>
+            <p className="text-sm text-red-600/80 dark:text-red-400/80 leading-relaxed font-medium max-w-2xl">{ineligibleReason}</p>
           </div>
-        )}
+        </motion.div>
+      )}
 
-        {/* Dash Summary */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
-           <div className="bg-white border border-border-subtle rounded-2xl p-6 shadow-sm">
-             <div className="flex items-center gap-3 text-brand-blue mb-4">
-                <div className="p-2 bg-blue-50 rounded-lg"><Wallet size={20} /></div>
-                <h3 className="font-bold text-sm uppercase tracking-wider">Active Credits</h3>
-             </div>
-             <p className="text-3xl font-black text-brand-navy">{sessions.filter(s => s.review_status === "APPROVED").length}</p>
-             <p className="text-xs text-slate-400 mt-1 font-medium">Approved loan agreements</p>
+      {/* Dash Summary - Bento Box Layout */}
+      <div className="grid grid-cols-1 md:grid-cols-12 gap-6 mb-12">
+         {/* Active Credits - Spans 5 cols */}
+         <motion.div 
+           initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
+           className="md:col-span-5 glass-panel rounded-3xl p-8 relative overflow-hidden group"
+         >
+           <div className="absolute -right-10 -top-10 w-40 h-40 bg-brand-blue/10 rounded-full blur-3xl group-hover:bg-brand-blue/20 transition-all"></div>
+           <div className="flex items-center gap-4 text-brand-blue mb-8">
+              <div className="p-3 bg-brand-blue/10 backdrop-blur-md rounded-2xl border border-brand-blue/20">
+                <Wallet size={24} />
+              </div>
+              <h3 className="font-bold text-sm uppercase tracking-widest">Active Credits</h3>
            </div>
-           <div className="bg-white border border-border-subtle rounded-2xl p-6 shadow-sm">
-             <div className="flex items-center gap-3 text-amber-600 mb-4">
-                <div className="p-2 bg-amber-50 rounded-lg"><Clock size={20} /></div>
-                <h3 className="font-bold text-sm uppercase tracking-wider">In Progress</h3>
-             </div>
-             <p className="text-3xl font-black text-brand-navy">{sessions.filter(s => !s.review_status || s.review_status === "PENDING").length}</p>
-             <p className="text-xs text-slate-400 mt-1 font-medium">Pending bank approval</p>
-           </div>
-           <div className="bg-white border border-border-subtle rounded-2xl p-6 shadow-sm">
-             <div className="flex items-center gap-3 text-emerald-600 mb-4">
-                <div className="p-2 bg-emerald-50 rounded-lg"><BadgeCheck size={20} /></div>
-                <h3 className="font-bold text-sm uppercase tracking-wider">Verified State</h3>
-             </div>
-             <p className="text-3xl font-black text-brand-navy">{sessions.length > 0 ? "Tier 1" : "Unverified"}</p>
-             <p className="text-xs text-slate-400 mt-1 font-medium">Account verification status</p>
-           </div>
-        </div>
+           <p className="text-5xl font-black text-slate-900 dark:text-white tracking-tighter">
+              {sessions.filter(s => s.review_status === "APPROVED").length}
+           </p>
+           <p className="text-xs text-slate-500 dark:text-slate-400 mt-2 font-medium tracking-wide">Approved loan agreements</p>
+         </motion.div>
 
-        {/* Application List */}
-        <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-slate-400 mb-6 flex items-center gap-2">
-           <FileText size={14} /> Application History
-        </h3>
+         {/* In Progress - Spans 4 cols */}
+         <motion.div 
+           initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}
+           className="md:col-span-4 glass-panel rounded-3xl p-8 relative overflow-hidden group"
+         >
+           <div className="absolute -right-10 -top-10 w-40 h-40 bg-amber-500/10 rounded-full blur-3xl group-hover:bg-amber-500/20 transition-all"></div>
+           <div className="flex items-center gap-4 text-amber-500 mb-8">
+              <div className="p-3 bg-amber-500/10 backdrop-blur-md rounded-2xl border border-amber-500/20">
+                <Clock size={24} />
+              </div>
+              <h3 className="font-bold text-sm uppercase tracking-widest">In Progress</h3>
+           </div>
+           <p className="text-5xl font-black text-slate-900 dark:text-white tracking-tighter">
+              {sessions.filter(s => !s.review_status || s.review_status === "PENDING").length}
+           </p>
+           <p className="text-xs text-slate-500 dark:text-slate-400 mt-2 font-medium tracking-wide">Pending bank approval</p>
+         </motion.div>
 
-        <div className="space-y-4">
+         {/* Verified State - Spans 3 cols */}
+         <motion.div 
+           initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}
+           className="md:col-span-3 glass-panel rounded-3xl p-8 relative overflow-hidden group"
+         >
+           <div className="absolute -right-10 -top-10 w-40 h-40 bg-emerald-500/10 rounded-full blur-3xl group-hover:bg-emerald-500/20 transition-all"></div>
+           <div className="flex items-center gap-4 text-emerald-500 mb-8">
+              <div className="p-3 bg-emerald-500/10 backdrop-blur-md rounded-2xl border border-emerald-500/20">
+                <BadgeCheck size={24} />
+              </div>
+              <h3 className="font-bold text-sm uppercase tracking-widest">Verified</h3>
+           </div>
+           <p className="text-3xl font-black text-slate-900 dark:text-white tracking-tighter mt-4">
+              {sessions.length > 0 ? "Tier 1" : "None"}
+           </p>
+           <p className="text-xs text-slate-500 dark:text-slate-400 mt-2 font-medium tracking-wide">KYC Status</p>
+         </motion.div>
+      </div>
+
+      {/* Application List */}
+      <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400 mb-6 flex items-center gap-2">
+         <FileText size={14} /> Application Archive
+      </h3>
+
+      <div className="glass-panel rounded-3xl overflow-hidden p-2">
+        <div className="space-y-1">
           {loading ? (
             Array.from({ length: 3 }).map((_, i) => (
-              <div key={i} className="h-24 bg-white border border-border-subtle rounded-2xl animate-pulse" />
+              <div key={i} className="h-20 bg-slate-200/20 dark:bg-slate-800/20 rounded-2xl animate-pulse" />
             ))
           ) : sessions.length === 0 ? (
-            <div className="py-20 text-center border-2 border-dashed border-border-subtle rounded-3xl">
-               <p className="text-slate-400 text-sm mb-4 italic">You don't have any active loan applications.</p>
-               <button onClick={startNew} className="text-brand-blue font-bold text-sm hover:underline">Start your first one now →</button>
+            <div className="py-20 text-center">
+               <p className="text-slate-400 dark:text-slate-500 text-sm mb-4 font-medium">You don't have any active loan applications.</p>
+               <button onClick={startNew} className="text-brand-blue font-bold text-sm hover:text-blue-400 transition">Start your first one now →</button>
             </div>
-          ) : sessions.map((s) => {
+          ) : sessions.map((s, idx) => {
             const status = s.review_status || "PENDING";
             const offer = s.latest_offer;
             const kyc = s.latest_extraction;
 
             return (
-              <div key={s.session_id} className="bg-white border border-border-subtle rounded-2xl p-6 shadow-sm hover:shadow-md transition group">
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-                  {/* Info */}
-                  <div className="flex items-start gap-4">
-                    <div className={`p-3 rounded-xl shrink-0 ${
-                      status === "APPROVED" ? "bg-emerald-50 text-emerald-600" :
-                      status === "REJECTED" ? "bg-red-50 text-red-600" : "bg-slate-50 text-slate-400"
-                    }`}>
-                      {status === "APPROVED" ? <CheckCircle2 size={24} /> : status === "REJECTED" ? <XCircle size={24} /> : <Clock size={24} />}
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-3 mb-1">
-                        <span className={`text-[10px] font-bold uppercase tracking-widest ${
-                          status === "APPROVED" ? "text-emerald-600" : status === "REJECTED" ? "text-red-500" : "text-amber-600"
-                        }`}>
-                          {status}
-                        </span>
-                        <span className="text-[10px] font-mono text-slate-300 uppercase tracking-tighter">REF: {s.session_id.slice(0, 12)}...</span>
-                      </div>
-                      <h4 className="text-lg font-bold text-brand-navy leading-tight">
-                        {kyc?.loan_purpose || "General Purpose Credit Application"}
-                      </h4>
-                      <p className="text-xs text-slate-400 mt-1">Submitted on {s.created_at ? new Date(s.created_at).toLocaleDateString("en-IN", { day: 'numeric', month: 'long', year: 'numeric' }) : "—"}</p>
-                    </div>
+              <motion.div 
+                initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.1 * idx }}
+                key={s.session_id} 
+                className="flex flex-col md:flex-row md:items-center justify-between gap-6 p-5 rounded-2xl hover:bg-slate-50/50 dark:hover:bg-white/5 transition-all group"
+              >
+                {/* Info */}
+                <div className="flex items-center gap-5">
+                  <div className={`p-3 rounded-2xl shrink-0 backdrop-blur-md shadow-inner ${
+                    status === "APPROVED" ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20" :
+                    status === "REJECTED" ? "bg-red-500/10 text-red-500 border border-red-500/20" : "bg-amber-500/10 text-amber-500 border border-amber-500/20"
+                  }`}>
+                    {status === "APPROVED" ? <CheckCircle2 size={24} /> : status === "REJECTED" ? <XCircle size={24} /> : <Clock size={24} />}
                   </div>
-
-                  {/* Financials & Action */}
-                  <div className="flex items-center gap-8 pl-12 md:pl-0">
-                    {offer?.amount && (
-                      <div className="text-right">
-                         <p className="text-lg font-black text-brand-navy leading-tight">₹{offer.amount.toLocaleString()}</p>
-                         <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter">{offer.roi}% Fixed Interest</p>
-                      </div>
-                    )}
-                    <div className="h-10 w-px bg-slate-100 hidden sm:block" />
-                    <button className="flex items-center gap-2 text-sm font-bold text-brand-blue group-hover:gap-3 transition-all">
-                      View Details <ArrowRight size={16} />
-                    </button>
+                  <div>
+                    <h4 className="text-base font-bold text-slate-900 dark:text-white leading-tight mb-1">
+                      {kyc?.loan_purpose || "General Purpose Credit"}
+                    </h4>
+                    <div className="flex items-center gap-3">
+                      <span className="text-[10px] font-mono text-slate-400 uppercase tracking-tighter">
+                        REF: {s.session_id.split("-")[0]}
+                      </span>
+                      <span className="text-[10px] text-slate-400/60">•</span>
+                      <span className="text-[10px] text-slate-400 font-medium">
+                        {s.created_at ? new Date(s.created_at).toLocaleDateString("en-US", { month: 'short', day: 'numeric', year: 'numeric' }) : "—"}
+                      </span>
+                    </div>
                   </div>
                 </div>
-              </div>
+
+                {/* Financials & Action */}
+                <div className="flex items-center gap-8 pl-14 md:pl-0">
+                  {offer?.amount && status === "APPROVED" && (
+                    <div className="text-right">
+                       <p className="text-lg font-black text-slate-900 dark:text-white leading-tight tracking-tight">₹{offer.amount.toLocaleString()}</p>
+                       <p className="text-[10px] text-emerald-500 font-bold uppercase tracking-wider">{offer.roi}% Fixed</p>
+                    </div>
+                  )}
+                  
+                  {/* Status Badge */}
+                  <div className={`px-4 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest border backdrop-blur-sm ${
+                    status === "APPROVED" ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/30 shadow-[0_0_15px_rgba(16,185,129,0.15)]" :
+                    status === "REJECTED" ? "bg-red-500/10 text-red-500 border-red-500/30 shadow-[0_0_15px_rgba(239,68,68,0.15)]" :
+                    "bg-amber-500/10 text-amber-500 border-amber-500/30 shadow-[0_0_15px_rgba(245,158,11,0.15)]"
+                  }`}>
+                    {status}
+                  </div>
+
+                  <button className="h-10 w-10 flex items-center justify-center rounded-xl bg-slate-100 dark:bg-white/5 text-slate-400 hover:text-brand-blue hover:bg-white transition-all group-hover:scale-105">
+                    <ArrowRight size={18} />
+                  </button>
+                </div>
+              </motion.div>
             );
           })}
         </div>
+      </div>
 
-        {/* Footer Support Info */}
-        <div className="mt-16 bg-slate-100/50 rounded-3xl p-8 flex flex-col md:flex-row items-center justify-between gap-6">
-           <div className="text-center md:text-left">
-              <h5 className="font-bold text-brand-navy mb-1">Confidential & Secure</h5>
-              <p className="text-xs text-slate-500 max-w-xs leading-relaxed">Your data is processed in compliance with SecureBank's digital banking privacy standards. All biometric sessions are encrypted.</p>
-           </div>
-           <div className="flex gap-4">
-              <button className="flex items-center gap-2 px-4 py-2 text-xs font-bold text-slate-500 hover:text-brand-navy transition">
-                <ExternalLink size={14} /> Help Center
-              </button>
-              <button className="flex items-center gap-2 px-4 py-2 text-xs font-bold text-slate-500 hover:text-brand-navy transition">
-                <BadgeCheck size={14} /> Compliance Info
-              </button>
-           </div>
-        </div>
-      </main>
+      {/* Footer Support Info */}
+      <div className="mt-16 text-center pb-8 opacity-60 hover:opacity-100 transition-opacity">
+         <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">SecureBank Systems</p>
+         <p className="text-[10px] text-slate-400 max-w-sm mx-auto leading-relaxed">
+           Your data is processed in compliance with digital banking privacy standards. All biometric sessions are E2E encrypted.
+         </p>
+      </div>
     </div>
   );
 }

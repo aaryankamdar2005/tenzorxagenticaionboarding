@@ -338,3 +338,4 @@ async def onboarding_socket(websocket: WebSocket, session_id: str) -> None:
             "payload": {"best_age": _mode_age(session_id)},
         })
         logger.info("WS disconnected: session=%s", session_id)
+from app.models.schemas import KYCExtraction, WSOutboundEvent
