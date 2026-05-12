@@ -28,7 +28,12 @@ app = FastAPI(title="Agentic AI Video KYC — SecureBank", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "http://localhost:3000",
+        "https://soft-raindrop-51fbcc.netlify.app",
+        "https://tenzorxagenticaionboarding.onrender.com",
+    ],
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
