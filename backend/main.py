@@ -24,7 +24,21 @@ async def lifespan(_app: FastAPI):
     await disconnect_db()
 
 
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
+import logging
+
+logger = logging.getLogger(__name__)
+
 app = FastAPI(title="Agentic AI Video KYC — SecureBank", lifespan=lifespan)
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    logger.error(f"Unhandled exception: {exc}", exc_info=True)
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Internal Server Error", "message": str(exc)}
+    )
 
 app.add_middleware(
     CORSMiddleware,

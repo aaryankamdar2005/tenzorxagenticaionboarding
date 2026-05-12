@@ -62,7 +62,7 @@ async def register(body: UserRegisterRequest):
 async def login(body: UserLoginRequest):
     db = get_database()
     user = await db["users"].find_one({"email": body.email.lower()})
-    if not user or not check_password(body.password, user["password_hash"]):
+    if not user or not check_password(body.password, user.get("password_hash", "")):
         raise HTTPException(status_code=401, detail="Invalid email or password")
 
     user_id = str(user["_id"])
