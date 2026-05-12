@@ -32,6 +32,7 @@ app.add_middleware(
         "http://localhost:3000",
         "https://soft-raindrop-51fbcc.netlify.app",
         "https://tenzorxagenticaionboarding.onrender.com",
+        "https://tenzorxagenticaionboarding.vercel.app"
     ],
     allow_credentials=True,
     allow_methods=["*"],
