@@ -33,6 +33,7 @@ export interface KYCFields {
   monthly_emi_obligations?: number | null;
   property_ownership?: string | null;
   loan_purpose?: string | null;
+  requested_loan_amount?: number | null;
   explicit_consent?: boolean;
   stress_flag?: boolean;
   stress_reasons?: string[];
@@ -42,6 +43,7 @@ export interface KYCFields {
 
 export interface OfferResult {
   status: "APPROVED" | "REJECTED" | "REVIEW";
+  requested_amount?: number | null;
   amount?: number | null;
   roi?: number | null;
   tenure_months?: number | null;

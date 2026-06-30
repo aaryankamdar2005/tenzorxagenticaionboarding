@@ -25,77 +25,6 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api", tags=["documents"])
 
 
-# ── OCR Engines ───────────────────────────────────────────────────────────────
-
-@lru_cache(maxsize=1)
-def _get_easyocr_reader():
-    try:
-        import easyocr  # type: ignore
-        logger.info("Initialising EasyOCR reader…")
-        reader = easyocr.Reader(["en"], gpu=False, verbose=False)
-        logger.info("EasyOCR ready.")
-        return reader
-    except ImportError:
-        logger.warning("easyocr not installed")
-        return None
-    except Exception as exc:
-        logger.warning("EasyOCR init failed: %s", exc)
-        return None
-
-
-def _preprocess(image_bytes: bytes):
-    from PIL import Image, ImageEnhance, ImageFilter  # type: ignore
-    img = Image.open(io.BytesIO(image_bytes)).convert("RGB")
-    w, h = img.size
-    if w < 1800:
-        scale = 1800 / w
-        img = img.resize((int(w * scale), int(h * scale)), Image.LANCZOS)
-    img = img.filter(ImageFilter.SHARPEN)
-    img = ImageEnhance.Contrast(img).enhance(2.2)
-    img = ImageEnhance.Sharpness(img).enhance(2.5)
-    return img
-
-
-def _run_easyocr(image_bytes: bytes) -> str:
-    reader = _get_easyocr_reader()
-    if reader is None:
-        return ""
-    try:
-        import numpy as np  # type: ignore
-        img = _preprocess(image_bytes)
-        img_np = np.array(img)
-        results = reader.readtext(img_np, detail=0, paragraph=False)
-        text = "\n".join(str(r) for r in results)
-        logger.info("EasyOCR extracted %d chars", len(text))
-        return text
-    except Exception as exc:
-        logger.warning("EasyOCR failed: %s", exc)
-        return ""
-
-
-def _run_tesseract(image_bytes: bytes) -> str:
-    try:
-        import pytesseract  # type: ignore
-        from PIL import ImageOps  # type: ignore
-        img = _preprocess(image_bytes)
-        grey = ImageOps.grayscale(img)
-        binary = grey.point(lambda x: 0 if x < 140 else 255, "1").convert("L")
-        t1 = pytesseract.image_to_string(binary, lang="eng", config="--psm 6 --oem 3").strip()
-        t2 = pytesseract.image_to_string(grey, lang="eng", config="--psm 6 --oem 3").strip()
-        return max([t1, t2], key=len)
-    except Exception as exc:
-        if "TesseractNotFound" in type(exc).__name__:
-            logger.warning("Tesseract binary not found — skipping")
-        else:
-            logger.warning("Tesseract failed: %s", exc)
-        return ""
-
-
-def _run_ocr(image_bytes: bytes) -> str:
-    # Disable EasyOCR by default to prevent OOM kills on low-RAM containers like Render.
-    # Tesseract is pre-installed in the Docker container and uses a fraction of the RAM.
-    return _run_tesseract(image_bytes)
-
 
 # ── Fuzzy matching helper ─────────────────────────────────────────────────────
 
@@ -131,22 +60,16 @@ async def extract_document(
     if doc_type not in ("pan", "aadhaar", "bank_statement", "payslip"):
         raise HTTPException(400, "document_type must be: pan | aadhaar | bank_statement | payslip")
 
-    # Step 1: OCR
-    ocr_text = _run_ocr(image_bytes)
-    if not ocr_text:
+    # Step 1: LLM-powered structured extraction via Groq Vision API
+    extracted = await extract_document_fields(image_bytes, doc_type)
+    if not extracted:
         return JSONResponse({
             "document_type": doc_type,
-            "ocr_raw_text": None,
             "extracted": {},
             "match_score": 0.0,
             "is_match": False,
-            "error": "OCR engine unavailable. Install easyocr: pip install easyocr",
+            "error": "Document extraction failed.",
         })
-
-    logger.info("OCR [%s] extracted %d chars", doc_type, len(ocr_text))
-
-    # Step 2: LLM-powered structured extraction
-    extracted = await extract_document_fields(ocr_text, doc_type)
     logger.info("LLM extracted fields: %s", extracted)
 
     # Step 3: Fuzzy matching for identity docs
@@ -165,7 +88,6 @@ async def extract_document(
 
     result = {
         "document_type": doc_type,
-        "ocr_raw_text": ocr_text[:800],
         "extracted": extracted,
         "match_score": round(match_score, 1),
         "is_match": is_match,
@@ -202,15 +124,13 @@ async def verify_document(
     if len(image_bytes) < 1000:
         raise HTTPException(400, "Image too small")
 
-    ocr_text = _run_ocr(image_bytes)
-    if not ocr_text:
+    extracted = await extract_document_fields(image_bytes, "pan")
+    if not extracted:
         return JSONResponse({
-            "ocr_name": None, "ocr_dob": None, "ocr_raw_text": None,
+            "ocr_name": None, "ocr_dob": None,
             "match_score": 0.0, "is_match": False,
-            "error": "OCR engine unavailable",
+            "error": "Document extraction failed",
         })
-
-    extracted = await extract_document_fields(ocr_text, "pan")
 
     ocr_name = extracted.get("name")
     ocr_dob = extracted.get("dob")
@@ -229,7 +149,6 @@ async def verify_document(
     result = {
         "ocr_name": ocr_name,
         "ocr_dob": ocr_dob,
-        "ocr_raw_text": ocr_text[:800],
         "match_score": round(match_score, 1),
         "is_match": match_score >= 60.0,
     }

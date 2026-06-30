@@ -30,6 +30,7 @@ class KYCExtraction(BaseModel):
     monthly_emi_obligations: float | None = None   # NEW — existing EMI burden
     property_ownership: str | None = None          # NEW — owned / rented
     loan_purpose: str | None = None
+    requested_loan_amount: float | None = None     # NEW
     explicit_consent: bool = False
     stress_flag: bool = False
     stress_reasons: list[str] = Field(default_factory=list)
@@ -39,6 +40,7 @@ class KYCExtraction(BaseModel):
 
 class OfferResult(BaseModel):
     status: Status
+    requested_amount: float | None = None
     amount: float | None = None
     roi: float | None = None
     tenure_months: int | None = None

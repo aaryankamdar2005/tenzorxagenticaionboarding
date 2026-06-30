@@ -72,23 +72,28 @@ async def submit_session(session_id: str) -> dict:
     customer_name = session.get("customer_name", "").strip().lower()
     extracted_name = session.get("latest_extraction", {}).get("full_name", "").strip().lower()
 
-    # Reject if names do not match
-    if customer_name and extracted_name and customer_name != extracted_name:
-        await db["sessions"].update_one(
-            {"session_id": session_id},
-            {"$set": {
-                "state": "REJECTED",
-                "review_status": "REJECTED",
-                "submitted_at": utc_now(),
-                "final_score": {
-                    "confidence_score": 0,
-                    "approval_recommendation": "REJECTED",
-                    "reasons": [f"Name mismatch: Registered account name '{session.get('customer_name')}' does not match KYC document name '{session.get('latest_extraction', {}).get('full_name')}'."]
-                }
-            }}
-        )
-        await log_event("audit_logs", {"session_id": session_id, "event": "SESSION_AUTO_REJECTED"})
-        return {"status": "rejected", "reason": "Name mismatch"}
+    # pyrefly: ignore [missing-import]
+    from rapidfuzz import fuzz
+
+    # Reject if names do not match (fuzzy match to allow minor inconsistencies)
+    if customer_name and extracted_name:
+        match_score = fuzz.token_set_ratio(customer_name, extracted_name)
+        if match_score < 60:
+            await db["sessions"].update_one(
+                {"session_id": session_id},
+                {"$set": {
+                    "state": "REJECTED",
+                    "review_status": "REJECTED",
+                    "submitted_at": utc_now(),
+                    "final_score": {
+                        "confidence_score": 0,
+                        "approval_recommendation": "REJECTED",
+                        "reasons": [f"Name mismatch: Registered account name '{session.get('customer_name')}' does not match KYC document name '{session.get('latest_extraction', {}).get('full_name')}'. Match score: {match_score}"]
+                    }
+                }}
+            )
+            await log_event("audit_logs", {"session_id": session_id, "event": "SESSION_AUTO_REJECTED"})
+            return {"status": "rejected", "reason": "Name mismatch"}
 
     result = await db["sessions"].update_one(
         {"session_id": session_id},

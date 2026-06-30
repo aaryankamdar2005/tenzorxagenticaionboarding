@@ -45,6 +45,7 @@ def generate_offer(detected_age: float | None, extraction: KYCExtraction) -> Off
 
     return OfferResult(
         status=status,
+        requested_amount=extraction.requested_loan_amount,
         amount=round(amount, 2),
         roi=roi,
         tenure_months=tenure,

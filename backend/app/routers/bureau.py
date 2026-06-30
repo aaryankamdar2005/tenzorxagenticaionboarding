@@ -115,7 +115,7 @@ async def check_eligibility(pan_number: str) -> JSONResponse:
             last_rejected = rejected_sessions[0]
             last_date = last_rejected.get("created_at")
             if last_date:
-                days_since = (now - last_date).days
+                days_since = (now.replace(tzinfo=None) - last_date.replace(tzinfo=None)).days
                 if days_since < 180:
                     return JSONResponse(
                         status_code=403,

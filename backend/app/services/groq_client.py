@@ -96,15 +96,16 @@ BASIC KYC (collect first):
 2. dob                  — Date of birth (DD/MM/YYYY)
 3. employer             — Employer or business name
 4. income_declaration   — Gross monthly income in INR (number only)
-5. loan_purpose         — Purpose and desired loan amount
+5. loan_purpose         — Purpose of the loan
+6. requested_loan_amount — Desired loan amount in INR (number only)
 
 THE 3 Cs — CAPACITY (collect after basic KYC):
-6. monthly_emi_obligations — "What is the total amount of EMIs or loan repayments you currently pay every month?"
-7. tenure_at_employer      — "How long have you been working with your current employer?"
-8. property_ownership      — "Do you live in a rented property or do you own your home?"
+7. monthly_emi_obligations — "What is the total amount of EMIs or loan repayments you currently pay every month?"
+8. tenure_at_employer      — "How long have you been working with your current employer?"
+9. property_ownership      — "Do you live in a rented property or do you own your home?"
 
 CONSENT (always last):
-9. explicit_consent — Verbal agreement to terms and data processing
+10. explicit_consent — Verbal agreement to terms and data processing
 
 RULES:
 - LANGUAGE: Reply in the SAME language the user spoke. Devanagari for Hindi/Marathi, Gurmukhi for Punjabi.
@@ -112,7 +113,7 @@ RULES:
 - If an answer is vague, ask ONE clarifying follow-up.
 - Be warm, concise (under 3 sentences), professional.
 - Count filler words ("um", "uh", "err", "acha", "matlab", "arre"): if 3+ detected, set stress_flag=true.
-- When ALL 9 fields are collected AND consent is given, set is_complete=true.
+- When ALL 10 fields are collected AND consent is given, set is_complete=true.
 
 You MUST respond in this EXACT JSON format — no markdown, no extra keys:
 {
@@ -123,6 +124,7 @@ You MUST respond in this EXACT JSON format — no markdown, no extra keys:
     "employer": "<string or null>",
     "income_declaration": <number or null>,
     "loan_purpose": "<string or null>",
+    "requested_loan_amount": <number or null>,
     "monthly_emi_obligations": <number or null>,
     "tenure_at_employer": "<string or null>",
     "property_ownership": "<rented|owned|null>",
@@ -146,7 +148,7 @@ async def run_kyc_agent(
             "agent_reply": "Hello! I'm Aria, your SecureBank loan officer. Could you please tell me your full name?",
             "extracted_fields": {k: None for k in [
                 "full_name", "dob", "employer", "income_declaration",
-                "loan_purpose", "monthly_emi_obligations", "tenure_at_employer",
+                "loan_purpose", "requested_loan_amount", "monthly_emi_obligations", "tenure_at_employer",
                 "property_ownership",
             ]},
             "stress_flag": False,
@@ -191,16 +193,22 @@ async def run_kyc_agent(
 
 # ── Document OCR + LLM Parsing ────────────────────────────────────────────────
 
+import base64
+
 async def extract_document_fields(
-    ocr_raw_text: str,
+    image_bytes: bytes,
     document_type: str,
 ) -> dict[str, Any]:
     """
-    Pass messy OCR text into Llama-3 to extract clean structured data.
+    Pass document image directly into Llama-3 Vision to extract clean structured data.
     document_type: 'pan', 'aadhaar', 'bank_statement', 'payslip'
     """
-    if not os.getenv("GROQ_API_KEY") or not ocr_raw_text.strip():
+    if not os.getenv("GROQ_API_KEY") or not image_bytes:
         return {}
+
+    # Encode image to base64 Data URI
+    b64_image = base64.b64encode(image_bytes).decode("utf-8")
+    data_uri = f"data:image/jpeg;base64,{b64_image}"
 
     if document_type in ("pan", "aadhaar"):
         output_spec = """\
@@ -210,8 +218,8 @@ async def extract_document_fields(
   "id_number": "<PAN/Aadhaar number or null>"
 }"""
         task = (
-            f"Extract the following fields from this {document_type.upper()} card OCR text. "
-            "Return ONLY the JSON object, no markdown."
+            f"Extract the following fields from this {document_type.upper()} card. "
+            "Return ONLY the JSON object, no markdown formatting or explanations."
         )
     else:  # bank_statement or payslip
         output_spec = """\
@@ -222,24 +230,31 @@ async def extract_document_fields(
   "income_source": "<employer/salary/business or null>"
 }"""
         task = (
-            "Analyze this bank statement / payslip OCR text. "
+            "Analyze this bank statement / payslip image. "
             "Look specifically for salary credits or monthly income transfers. "
             "Return the average or most recent monthly income amount. "
-            "Return ONLY the JSON object, no markdown."
+            "Return ONLY the JSON object, no markdown formatting or explanations."
         )
 
-    prompt = f"{task}\n\nOutput format:\n{output_spec}\n\nOCR TEXT:\n{ocr_raw_text[:3000]}"
+    prompt = f"{task}\n\nOutput format:\n{output_spec}\n\nIMPORTANT: Return ONLY a valid JSON object. Do not include markdown blocks like ```json."
 
     body = {
-        "model": "llama-3.3-70b-versatile",
+        "model": "meta-llama/llama-4-scout-17b-16e-instruct",
         "temperature": 0,
-        "messages": [{"role": "user", "content": prompt}],
-        "response_format": {"type": "json_object"},
-        "max_tokens": 256,
+        "messages": [
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": prompt},
+                    {"type": "image_url", "image_url": {"url": data_uri}}
+                ]
+            }
+        ],
+        "max_tokens": 512,
     }
 
     try:
-        async with httpx.AsyncClient(timeout=30) as client:
+        async with httpx.AsyncClient(timeout=45) as client:
             resp = await client.post(
                 f"{GROQ_API_BASE}/chat/completions",
                 headers=_headers(),
@@ -247,6 +262,14 @@ async def extract_document_fields(
             )
             resp.raise_for_status()
             content = resp.json()["choices"][0]["message"]["content"]
+            
+            # Clean potential markdown output
+            content = content.strip()
+            if content.startswith("```"):
+                content = content.split("\n", 1)[-1]
+            if content.endswith("```"):
+                content = content.rsplit("\n", 1)[0]
+                
             return json.loads(content)
     except Exception as exc:
         logger.warning("LLM document extraction failed: %s", exc)
@@ -280,6 +303,7 @@ KYC Interview Responses:
   - Monthly EMI Obligations (INR): {kyc_fields.get('monthly_emi_obligations') or 'NOT PROVIDED'}
   - Property Ownership: {kyc_fields.get('property_ownership') or 'NOT PROVIDED'}
   - Loan Purpose: {kyc_fields.get('loan_purpose') or 'NOT PROVIDED'}
+  - Requested Loan Amount (INR): {kyc_fields.get('requested_loan_amount') or 'NOT PROVIDED'}
   - Verbal Consent Given: {kyc_fields.get('explicit_consent', False)}
 
 Automated Fraud Signals:
@@ -294,9 +318,10 @@ Automated Fraud Signals:
         "You are a senior loan underwriting AI at SecureBank. Analyze the KYC data and fraud signals below.\n"
         "Determine: confidence_score (0-100), approval_recommendation (APPROVE/REJECT/MANUAL_REVIEW), and reasons.\n\n"
         "Decision guidelines:\n"
-        "  APPROVE        → score ≥ 75, all KYC fields present, liveness passed, low fraud signals\n"
-        "  REJECT         → income missing, no consent, liveness failed, geo mismatch >500km, underage\n"
+        "  APPROVE        → score ≥ 75, all major KYC fields present, liveness passed, low fraud signals\n"
+        "  REJECT         → income missing entirely, no consent given, liveness failed, geo mismatch >500km, underage\n"
         "  MANUAL_REVIEW  → borderline cases, partial data, moderate fraud signals\n\n"
+        "Important Note: Do not assign 0 confidence or automatically REJECT for minor inconsistencies (e.g. spelling mistakes, or minor name mismatches like missing a surname). Ignore minor discrepancies if the overall context is coherent.\n\n"
         'Respond ONLY in this JSON format:\n'
         '{"confidence_score": <int>, "approval_recommendation": "<str>", "reasons": ["<str>", ...]}\n\n'
         f"{context}"
@@ -346,6 +371,7 @@ async def extract_kyc_json(conversation_buffer: str) -> KYCExtraction:
         tenure_at_employer=fields.get("tenure_at_employer"),
         property_ownership=fields.get("property_ownership"),
         loan_purpose=fields.get("loan_purpose"),
+        requested_loan_amount=fields.get("requested_loan_amount"),
         explicit_consent=bool(fields.get("explicit_consent", False)),
         stress_flag=result.get("stress_flag", False),
         stress_reasons=result.get("stress_reasons", []),

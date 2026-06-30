@@ -312,7 +312,11 @@ function DashboardInner() {
                   <span className={`rounded-full px-3 py-1 text-[9px] font-bold uppercase tracking-widest border backdrop-blur-md ${
                     offer.status === "APPROVED" ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/30" :
                     offer.status === "REJECTED" ? "bg-red-500/10 text-red-500 border-red-500/30" : "bg-amber-500/10 text-amber-500 border-amber-500/30"
-                  }`}>{offer.status} {offer.amount ? `· ₹${offer.amount.toLocaleString()}` : ""}</span>
+                  }`}>
+                    {offer.status}
+                    {offer.amount ? ` · ₹${offer.amount.toLocaleString()} APVD` : ""}
+                    {offer.requested_amount ? ` (REQ: ₹${offer.requested_amount.toLocaleString()})` : ""}
+                  </span>
                 </div>
               )}
             </div>
